@@ -1,0 +1,349 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Trevon Hotels — Sales Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<script src="d3.min.js"></script>
+<style>
+:root{
+  --bg:#f6f5f1;--panel:#ffffff;--fg:#1d1f23;--muted:#6b6f76;--line:#e4e2dc;--grid:#eeece6;
+  --c1:#1f5f8b;--c2:#c8833a;--c3:#7a8f5a;--muted-bar:#c9ccd1;--bad:#b3261e;--ok:#2e7d4f;--warn:#a86400;
+  --tip:#ffffff;--shadow:0 6px 20px rgba(0,0,0,.08);
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"Source Serif 4",Georgia,serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#141518;--panel:#1c1e22;--fg:#ecebe7;--muted:#9a9ea6;--line:#2c2f35;--grid:#26292e;
+  --c1:#6aaee0;--c2:#e3a463;--c3:#a7bd84;--muted-bar:#4a4e56;--bad:#f2867c;--ok:#7ccf9b;--warn:#e6b45c;
+  --tip:#24272c;--shadow:0 6px 20px rgba(0,0,0,.4);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 16px 60px;display:flex;flex-direction:column;gap:28px}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(26px,3.4vw,36px);margin:0;letter-spacing:-.01em}
+h2{font-size:18px;font-weight:600;margin:0 0 4px}
+h3{font-size:15px;font-weight:600;margin:0}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-end}
+.meta{color:var(--muted);font-size:13px}
+select{font:inherit;font-size:14px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--panel);color:var(--fg)}
+.take{font-size:17px;margin:10px 0 0;max-width:62rem}
+.take b{font-weight:600}
+.note{color:var(--muted);font-size:13px;margin:6px 0 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:12px}
+.card,.tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.tile{display:flex;flex-direction:column;gap:4px}
+.lbl{font-size:12.5px;color:var(--muted)}
+.big{font-family:var(--serif);font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.sub{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:12px}
+.cap{color:var(--muted);font-size:13px;margin:4px 0 0}
+.chart{position:relative;margin-top:10px;min-height:120px}
+.chart svg{display:block;overflow:visible}
+.chart text{font-size:12px;fill:var(--muted);font-family:var(--sans)}
+.chart text.end{fill:var(--fg);font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend i.tick{width:2px;height:12px;border-radius:0;background:var(--fg)}
+.tip{position:absolute;pointer-events:none;background:var(--tip);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:6px 10px;font-size:12.5px;white-space:nowrap;display:none;z-index:5}
+.tip .t{color:var(--muted);margin-bottom:2px}
+.tw{overflow:auto;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:right;font-weight:600;color:var(--muted);padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{text-align:right;padding:8px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+.good{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+ul.watch{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+ul.watch b{font-weight:600}
+.err{padding:40px;text-align:center;color:var(--muted)}
+footer{color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <div class="top">
+      <div>
+        <h1>Trevon Hotels — sales &amp; occupancy</h1>
+        <div class="meta" id="updated">Loading…</div>
+      </div>
+      <label class="meta">Month <select id="month"></select></label>
+    </div>
+    <p class="take" id="take"></p>
+    <p class="note" id="note"></p>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card"><h2>What needs attention</h2><ul class="watch" id="watch"></ul></section>
+
+  <section>
+    <h2>Properties</h2>
+    <div class="grid2">
+      <div class="card"><h3>Revenue against budget, month to date</h3><p class="cap">Bar is actual revenue; the black tick is the budget for the same days. Label is % achieved.</p><div class="chart" id="ch-budget"></div></div>
+      <div class="card"><h3>Where the revenue comes from</h3><p class="cap">Rooms, food &amp; beverage and other income, month to date. Label is F&amp;B's share.</p><div class="legend" id="lg-mix"></div><div class="chart" id="ch-mix"></div></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Property scorecard</h2>
+    <p class="cap">ARR = room revenue ÷ rooms sold. RevPAR = room revenue ÷ all room-nights. Occupancy counts every room, including out-of-order ones. Forecast = revenue so far ÷ days so far × days in the month.</p>
+    <div class="tw"><table id="score"><thead><tr><th>Property</th><th>Latest day</th><th>Revenue MTD</th><th>% of budget</th><th>Rooms MTD</th><th>F&amp;B MTD</th><th>Occupancy</th><th>Occ. budget</th><th>ARR</th><th>RevPAR</th><th>Month forecast</th><th>Latest day revenue</th><th>vs day before</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <section>
+    <h2>Daily and weekly sales</h2>
+    <div class="grid2">
+      <div class="card"><h3>Revenue per day, all properties</h3><p class="cap">Stacked by property. Only days entered one by one are shown; opening balances are left out.</p><div class="legend" id="lg-daily"></div><div class="chart" id="ch-daily"></div></div>
+      <div class="card"><h3>Weekly totals</h3><p class="cap">Weeks run Monday to Sunday. Opening balances are left out.</p><div class="tw"><table id="weekly"><thead><tr><th>Week starting</th><th>Days</th><th>Revenue</th><th>Rooms</th><th>F&amp;B</th><th>Rooms sold</th><th>Occupancy</th></tr></thead><tbody></tbody></table></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Rooms</h2>
+    <div class="grid2">
+      <div class="card"><h3>Occupancy against budget, month to date</h3><p class="cap">Rooms sold ÷ room-nights. The black tick is budgeted occupancy.</p><div class="chart" id="ch-occ"></div></div>
+      <div class="card"><h3>Average room rate, month to date</h3><p class="cap">Room revenue per room sold.</p><div class="chart" id="ch-arr"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Food &amp; beverage and banquets</h2>
+    <div class="grid2">
+      <div class="card"><h3>F&amp;B by outlet, all properties, month to date</h3><p class="cap">Restaurant, in-room dining, meal plans, banquets, bar and venue hire.</p><div class="chart" id="ch-outlet"></div></div>
+      <div class="card"><h3>F&amp;B against budget by property</h3><p class="cap">The black tick is the F&amp;B budget for the same days.</p><div class="chart" id="ch-fnb"></div></div>
+    </div>
+  </section>
+
+  <footer id="foot">Figures come from each property's Daily Sales Log in Google Drive and refresh every day at 12:00 noon IST.</footer>
+</div>
+
+<script>
+(function(){
+const $ = (s) => document.querySelector(s);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const inr = (v) => { if (v == null || !isFinite(v)) return '—'; const a = Math.abs(v), s = v < 0 ? '-' : '';
+  if (a >= 1e7) return s + '₹' + (a/1e7).toFixed(2) + ' Cr'; if (a >= 1e5) return s + '₹' + (a/1e5).toFixed(1) + ' L';
+  return s + '₹' + Math.round(a).toLocaleString('en-IN'); };
+const pct = (v) => (v == null || !isFinite(v)) ? '—' : Math.round(v*100) + '%';
+const spct = (v) => (v == null || !isFinite(v)) ? '—' : (v >= 0 ? '+' : '−') + Math.abs(Math.round(v*100)) + '%';
+const dfmt = (s) => d3.utcFormat('%-d %b')(new Date(s + 'T00:00:00Z'));
+const mfmt = (m) => d3.utcFormat('%B %Y')(new Date(m + '-01T00:00:00Z'));
+const dim = (m) => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo, 0)).getUTCDate(); };
+const sum = (a, k) => a.reduce((t, r) => t + (r[k] || 0), 0);
+let DATA = null;
+
+function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function compute(month){
+  const R = DATA.rows.filter(r => r.date.slice(0,7) === month);
+  const props = Array.from(new Set(R.map(r => r.property)));
+  const P = props.map(p => {
+    const pr = R.filter(r => r.property === p).sort((a,b) => a.date < b.date ? -1 : 1);
+    const last = pr[pr.length-1];
+    const days = +last.date.slice(8,10);
+    const daily = pr.filter(r => r.type !== 'Carried forward');
+    const ld = daily[daily.length-1] || null, pd = daily.length > 1 ? daily[daily.length-2] : null;
+    const o = {property:p, last:last.date, days:days};
+    ['room','fnb','other','total','b_room','b_fnb','b_other','b_total','sold','avail','ooo','b_sold','restaurant','ird','plans','banquet','bar','venue'].forEach(k => o[k] = sum(pr,k));
+    o.pct = o.b_total ? o.total/o.b_total : null;
+    o.occ = o.avail ? o.sold/o.avail : null; o.occ_b = o.avail ? o.b_sold/o.avail : null;
+    o.arr = o.sold ? o.room/o.sold : null; o.revpar = o.avail ? o.room/o.avail : null;
+    o.forecast = o.total/days*dim(month); o.forecast_b = o.b_total/days*dim(month);
+    o.fnb_share = o.total ? o.fnb/o.total : null; o.ooo_share = o.avail ? o.ooo/o.avail : null;
+    o.day = ld ? ld.total : null; o.day_date = ld ? ld.date : null;
+    o.day_change = (ld && pd && pd.total) ? ld.total/pd.total - 1 : null;
+    return o;
+  });
+  const G = {};
+  ['room','fnb','other','total','b_room','b_fnb','b_total','sold','avail','b_sold','forecast','forecast_b','restaurant','ird','plans','banquet','bar','venue'].forEach(k => G[k] = sum(P,k));
+  G.pct = G.b_total ? G.total/G.b_total : null; G.room_pct = G.b_room ? G.room/G.b_room : null; G.fnb_pct = G.b_fnb ? G.fnb/G.b_fnb : null;
+  G.occ = G.avail ? G.sold/G.avail : null; G.occ_b = G.avail ? G.b_sold/G.avail : null;
+  G.arr = G.sold ? G.room/G.sold : null; G.revpar = G.avail ? G.room/G.avail : null;
+  const daily = R.filter(r => r.type !== 'Carried forward');
+  const dates = Array.from(new Set(daily.map(r => r.date))).sort();
+  const lastDate = dates[dates.length-1], prevDate = dates[dates.length-2];
+  if (lastDate){
+    const lp = daily.filter(r => r.date === lastDate);
+    G.day = sum(lp,'total'); G.day_date = lastDate; G.day_props = lp.length;
+    const names = lp.map(r => r.property);
+    const pp = daily.filter(r => r.date === prevDate && names.indexOf(r.property) >= 0);
+    G.day_prev = pp.length ? sum(pp,'total') : null;
+    G.day_change = G.day_prev ? G.day/G.day_prev - 1 : null;
+  }
+  // previous month, same days
+  const months = Array.from(new Set(DATA.rows.map(r => r.date.slice(0,7)))).sort();
+  const pm = months[months.indexOf(month)-1];
+  if (pm){
+    const maxDay = d3.max(P, p => p.days);
+    const PR = DATA.rows.filter(r => r.date.slice(0,7) === pm && +r.date.slice(8,10) <= maxDay);
+    G.prev_month = pm; G.prev_total = sum(PR,'total');
+  }
+  return {R, P, G, daily, dates, props};
+}
+
+function tile(label, value, sub){
+  const t = el('div','tile'); t.appendChild(el('span','lbl',label)); t.appendChild(el('span','big',value));
+  if (sub) t.appendChild(el('span','sub',sub)); return t;
+}
+
+function measure(svg, texts){ const t = svg.append('text').attr('class','end'); let w = 0;
+  texts.forEach(s => { t.text(s); w = Math.max(w, t.node().getComputedTextLength()); }); t.remove(); return w; }
+function tipFor(box){ const t = el('div','tip'); box.appendChild(t); return t; }
+function showTip(tip, box, ev, title, lines){
+  tip.innerHTML = ''; tip.appendChild(el('div','t',title)); lines.forEach(l => tip.appendChild(el('div',null,l)));
+  tip.style.display = 'block'; const b = box.getBoundingClientRect();
+  let x = ev.clientX - b.left + 12, y = ev.clientY - b.top + 12;
+  if (x + tip.offsetWidth > b.width) x = Math.max(0, ev.clientX - b.left - tip.offsetWidth - 12);
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+}
+function axisGrid(svg, x, m, H, W, fmt){
+  const ticks = x.ticks(Math.max(2, Math.floor((W - m.l - m.r)/95)));
+  svg.append('g').selectAll('line').data(ticks).join('line').attr('x1',d=>x(d)).attr('x2',d=>x(d)).attr('y1',m.t).attr('y2',H-m.b).attr('stroke',css('--grid'));
+  svg.append('g').selectAll('text').data(ticks).join('text').attr('x',d=>x(d)).attr('y',H-6).attr('text-anchor','middle').text(fmt);
+}
+
+function bullet(box, rows, fmt){
+  box.innerHTML = ''; if (!rows.length){ box.appendChild(el('div','cap','No data for this month.')); return; }
+  const W = Math.max(300, box.clientWidth), rh = 36;
+  const svg = d3.select(box).append('svg').attr('width','100%');
+  const m = {t:4, b:24, l: measure(svg, rows.map(r=>r.label)) + 14, r: measure(svg, rows.map(r=>r.end||'')) + 12};
+  const H = m.t + rows.length*rh + m.b; svg.attr('viewBox',`0 0 ${W} ${H}`).attr('height',H);
+  const x = d3.scaleLinear([0, d3.max(rows, r => Math.max(r.value||0, r.target||0)) || 1], [m.l, W-m.r]).nice();
+  const y = d3.scaleBand(rows.map(r=>r.label), [m.t, H-m.b]).padding(.3);
+  axisGrid(svg, x, m, H, W, fmt);
+  svg.append('g').selectAll('text').data(rows).join('text').attr('x',0).attr('y',r=>y(r.label)+y.bandwidth()/2).attr('dy','.35em').text(r=>r.label);
+  const bars = svg.append('g').selectAll('rect').data(rows).join('rect').attr('x',m.l).attr('y',r=>y(r.label)).attr('height',y.bandwidth())
+    .attr('width',r=>Math.max(0,x(r.value||0)-m.l)).attr('rx',4).attr('fill',r=>r.color||css('--c1'));
+  svg.append('g').selectAll('line').data(rows.filter(r=>r.target)).join('line').attr('x1',r=>x(r.target)).attr('x2',r=>x(r.target))
+    .attr('y1',r=>y(r.label)-4).attr('y2',r=>y(r.label)+y.bandwidth()+4).attr('stroke',css('--fg')).attr('stroke-width',2);
+  svg.append('g').selectAll('text').data(rows).join('text').attr('class','end').attr('x',r=>x(Math.max(r.value||0,r.target||0))+6)
+    .attr('y',r=>y(r.label)+y.bandwidth()/2).attr('dy','.35em').text(r=>r.end||'');
+  const tip = tipFor(box);
+  bars.on('mousemove',(ev,r)=>{bars.attr('opacity',d=>d===r?1:.55);showTip(tip,box,ev,r.label,r.tip||[]);}).on('mouseleave',()=>{bars.attr('opacity',1);tip.style.display='none';});
+}
+
+function stackedH(box, rows, keys, names, colors){
+  box.innerHTML = ''; if (!rows.length) return;
+  const W = Math.max(300, box.clientWidth), rh = 36;
+  const svg = d3.select(box).append('svg').attr('width','100%');
+  const m = {t:4, b:24, l: measure(svg, rows.map(r=>r.label)) + 14, r: measure(svg, rows.map(r=>r.end)) + 12};
+  const H = m.t + rows.length*rh + m.b; svg.attr('viewBox',`0 0 ${W} ${H}`).attr('height',H);
+  const tot = r => keys.reduce((a,k)=>a+(r[k]||0),0);
+  const x = d3.scaleLinear([0, d3.max(rows,tot)||1],[m.l,W-m.r]).nice();
+  const y = d3.scaleBand(rows.map(r=>r.label),[m.t,H-m.b]).padding(.3);
+  axisGrid(svg, x, m, H, W, inr);
+  svg.append('g').selectAll('text').data(rows).join('text').attr('x',0).attr('y',r=>y(r.label)+y.bandwidth()/2).attr('dy','.35em').text(r=>r.label);
+  const segs = []; rows.forEach(r => { let a = 0; keys.forEach((k,i) => { const v = r[k]||0; if (v > 0) segs.push({r, i, x0:a, x1:a+v}); a += v; }); });
+  const sel = svg.append('g').selectAll('rect').data(segs).join('rect').attr('x',s=>x(s.x0)).attr('width',s=>Math.max(0,x(s.x1)-x(s.x0)-1))
+    .attr('y',s=>y(s.r.label)).attr('height',y.bandwidth()).attr('rx',2).attr('fill',s=>colors[s.i]);
+  svg.append('g').selectAll('text').data(rows).join('text').attr('class','end').attr('x',r=>x(tot(r))+6).attr('y',r=>y(r.label)+y.bandwidth()/2).attr('dy','.35em').text(r=>r.end);
+  const tip = tipFor(box);
+  sel.on('mousemove',(ev,s)=>showTip(tip,box,ev,s.r.label,keys.map((k,i)=>names[i]+': '+inr(s.r[k])))).on('mouseleave',()=>tip.style.display='none');
+}
+
+function legend(box, items){ box.innerHTML=''; items.forEach(it => { const s = el('span'); const i = el('i'); i.style.background = it.color; s.appendChild(i); s.appendChild(document.createTextNode(it.name)); box.appendChild(s); }); }
+
+function dailyChart(box, daily, dates, props, colors){
+  box.innerHTML = ''; if (!dates.length){ box.appendChild(el('div','cap','No daily entries yet this month.')); return; }
+  const W = Math.max(300, box.clientWidth), H = 260, m = {t:10, r:10, b:28, l:62};
+  const svg = d3.select(box).append('svg').attr('width','100%').attr('viewBox',`0 0 ${W} ${H}`).attr('height',H);
+  const byDate = dates.map(d => { const o = {date:d}; props.forEach(p => { const r = daily.find(x => x.date===d && x.property===p); o[p] = r ? r.total : 0; }); o.total = props.reduce((a,p)=>a+o[p],0); return o; });
+  const x = d3.scaleBand(dates,[m.l,W-m.r]).padding(.25);
+  const y = d3.scaleLinear([0, d3.max(byDate,d=>d.total)||1],[H-m.b,m.t]).nice();
+  const yt = y.ticks(4);
+  svg.append('g').selectAll('line').data(yt).join('line').attr('x1',m.l).attr('x2',W-m.r).attr('y1',d=>y(d)).attr('y2',d=>y(d)).attr('stroke',css('--grid'));
+  svg.append('g').selectAll('text').data(yt).join('text').attr('x',m.l-8).attr('y',d=>y(d)).attr('dy','.35em').attr('text-anchor','end').text(inr);
+  const every = Math.ceil(dates.length / Math.max(1, Math.floor((W-m.l-m.r)/48)));
+  svg.append('g').selectAll('text').data(dates.filter((d,i)=>i%every===0)).join('text').attr('x',d=>x(d)+x.bandwidth()/2).attr('y',H-8).attr('text-anchor','middle').text(dfmt);
+  const stack = d3.stack().keys(props)(byDate);
+  const g = svg.append('g');
+  stack.forEach((layer,i) => g.append('g').selectAll('rect').data(layer).join('rect').attr('x',d=>x(d.data.date)).attr('width',x.bandwidth())
+    .attr('y',d=>y(d[1])).attr('height',d=>Math.max(0,y(d[0])-y(d[1]))).attr('fill',colors[i%colors.length]));
+  const tip = tipFor(box);
+  svg.append('g').selectAll('rect').data(byDate).join('rect').attr('x',d=>x(d.date)).attr('width',x.bandwidth()).attr('y',m.t).attr('height',H-m.b-m.t).attr('fill','transparent')
+    .on('mousemove',(ev,d)=>showTip(tip,box,ev,dfmt(d.date)+' · '+inr(d.total),props.filter(p=>d[p]).map(p=>p+': '+inr(d[p])))).on('mouseleave',()=>tip.style.display='none');
+}
+
+function weekly(tbody, daily){
+  tbody.innerHTML = '';
+  const wk = d3.rollups(daily, v => ({days:new Set(v.map(r=>r.date)).size, total:sum(v,'total'), room:sum(v,'room'), fnb:sum(v,'fnb'), sold:sum(v,'sold'), avail:sum(v,'avail')}),
+    r => { const d = new Date(r.date+'T00:00:00Z'); return d3.utcFormat('%Y-%m-%d')(d3.utcMonday.floor(d)); }).sort((a,b)=>a[0]<b[0]?1:-1);
+  if (!wk.length){ const tr = el('tr'); const td = el('td',null,'No daily entries yet.'); td.colSpan = 7; tr.appendChild(td); tbody.appendChild(tr); return; }
+  wk.forEach(([w,v]) => { const tr = el('tr');
+    [dfmt(w), v.days, inr(v.total), inr(v.room), inr(v.fnb), Math.round(v.sold).toLocaleString('en-IN'), pct(v.avail ? v.sold/v.avail : null)].forEach(c => tr.appendChild(el('td',null,String(c))));
+    tbody.appendChild(tr); });
+}
+
+function render(){
+  const month = $('#month').value;
+  const {P, G, daily, dates, props} = compute(month);
+  const colors = [css('--c1'),css('--c2'),css('--c3'),'#8e6bb8','#3a9a9a','#c55a7a','#6d7f99','#b0913a'];
+  $('#take').innerHTML = '';
+  const tk = $('#take');
+  const add = (t,b) => { const n = b ? el('b',null,t) : document.createTextNode(t); tk.appendChild(n); };
+  add('Group revenue is at '); add(pct(G.pct),1); add(' of budget for '+mfmt(month)+' so far: '); add(inr(G.total),1); add(' against '); add(inr(G.b_total),1);
+  add('. At this pace the month closes near '); add(inr(G.forecast),1); add(', against a budget of '); add(inr(G.forecast_b),1); add('.');
+  const lag = P.filter(p => p.last < (G.day_date || p.last)).map(p => p.property + ' (' + dfmt(p.last) + ')');
+  $('#note').textContent = lag.length ? 'Not yet reported for ' + dfmt(G.day_date) + ': ' + lag.join(', ') + '. Their figures run to the date shown.' : 'All properties reported up to ' + (G.day_date ? dfmt(G.day_date) : '—') + '.';
+
+  const k = $('#kpis'); k.innerHTML = '';
+  k.appendChild(tile('Total revenue · month to date', inr(G.total), pct(G.pct)+' of budget'));
+  k.appendChild(tile('Month-end forecast', inr(G.forecast), 'Budget '+inr(G.forecast_b)));
+  k.appendChild(tile('Latest day · '+(G.day_date?dfmt(G.day_date):'—'), inr(G.day), G.day_change==null?'':spct(G.day_change)+' vs day before'));
+  k.appendChild(tile('Rooms revenue · MTD', inr(G.room), pct(G.room_pct)+' of budget'));
+  k.appendChild(tile('F&B revenue · MTD', inr(G.fnb), pct(G.fnb_pct)+' of budget'));
+  k.appendChild(tile('Occupancy · MTD', pct(G.occ), 'Budget '+pct(G.occ_b)));
+  k.appendChild(tile('ARR · RevPAR', inr(G.arr), 'RevPAR '+inr(G.revpar)));
+  if (G.prev_month) k.appendChild(tile('vs '+mfmt(G.prev_month)+', same days', G.prev_total ? spct(G.total/G.prev_total-1) : '—', inr(G.prev_total)+' last month'));
+
+  const w = $('#watch'); w.innerHTML = '';
+  const li = (parts) => { const l = el('li'); parts.forEach(p => l.appendChild(typeof p === 'string' ? document.createTextNode(p) : p)); w.appendChild(l); };
+  const B = (t) => el('b',null,t);
+  const best = P.slice().sort((a,b)=>b.pct-a.pct)[0];
+  if (best) li([best.property+' is strongest against budget at ', B(pct(best.pct)), ', with F&B making up ', B(pct(best.fnb_share)), ' of its revenue.']);
+  P.filter(p=>p.pct<.5).sort((a,b)=>a.pct-b.pct).forEach(p=>li([p.property+' is at ', B(pct(p.pct)), ' of budget, heading for about ', B(inr(p.forecast)), ' this month against ', B(inr(p.forecast_b)), '.']));
+  P.filter(p=>p.occ_b-p.occ>.15).forEach(p=>li([p.property+' occupancy is ', B(pct(p.occ)), ' against a budget of ', B(pct(p.occ_b)), '.']));
+  P.filter(p=>p.ooo_share>.2).forEach(p=>li([p.property+' had ', B(pct(p.ooo_share)), ' of its room-nights out of order, which limits rooms it can sell.']));
+  if (G.banquet != null) { const bq = G.banquet; li(['Banquets have brought in ', B(inr(bq)), ' across the group this month.']); }
+  P.filter(p=>p.day_change!=null&&p.day_change<-.5).forEach(p=>li([p.property+' took ', B(inr(p.day)), ' on '+dfmt(p.day_date)+', ', B(spct(p.day_change)), ' on the day before.']));
+
+  const crit = css('--bad');
+  bullet($('#ch-budget'), P.slice().sort((a,b)=>b.pct-a.pct).map(p=>({label:p.property,value:p.total,target:p.b_total,end:pct(p.pct),color:p.pct<.5?crit:css('--c1'),
+    tip:['Actual: '+inr(p.total),'Budget: '+inr(p.b_total),'Achieved: '+pct(p.pct),'Up to '+dfmt(p.last)]})), inr);
+  legend($('#lg-mix'), [{name:'Rooms',color:css('--c1')},{name:'F&B',color:css('--c2')},{name:'Other',color:css('--c3')}]);
+  stackedH($('#ch-mix'), P.slice().sort((a,b)=>b.total-a.total).map(p=>({label:p.property,room:p.room,fnb:p.fnb,other:p.other,end:pct(p.fnb_share)+' F&B'})), ['room','fnb','other'], ['Rooms','F&B','Other'], [css('--c1'),css('--c2'),css('--c3')]);
+  bullet($('#ch-occ'), P.slice().sort((a,b)=>b.occ-a.occ).map(p=>({label:p.property,value:p.occ,target:p.occ_b,end:pct(p.occ),tip:['Occupancy: '+pct(p.occ),'Budget: '+pct(p.occ_b),'Rooms sold: '+Math.round(p.sold),'Room-nights: '+Math.round(p.avail)]})), pct);
+  bullet($('#ch-arr'), P.slice().sort((a,b)=>b.arr-a.arr).map(p=>({label:p.property,value:p.arr,end:inr(p.arr),tip:['ARR: '+inr(p.arr),'RevPAR: '+inr(p.revpar)]})), inr);
+  const outlets = [['Restaurant','restaurant'],['Meal plans','plans'],['In-room dining','ird'],['Banquet','banquet'],['Bar & beverage','bar'],['Venue charges','venue']]
+    .map(([n,kk])=>({label:n,value:G[kk],end:inr(G[kk]),color:css('--c2'),tip:P.filter(p=>p[kk]).map(p=>p.property+': '+inr(p[kk]))})).sort((a,b)=>b.value-a.value);
+  bullet($('#ch-outlet'), outlets, inr);
+  bullet($('#ch-fnb'), P.slice().sort((a,b)=>b.fnb-a.fnb).map(p=>({label:p.property,value:p.fnb,target:p.b_fnb||null,end:p.b_fnb?pct(p.fnb/p.b_fnb):inr(p.fnb),color:css('--c2'),
+    tip:['Actual: '+inr(p.fnb),'Budget: '+(p.b_fnb?inr(p.b_fnb):'none set')]})), inr);
+
+  const tb = $('#score tbody'); tb.innerHTML = '';
+  P.slice().sort((a,b)=>b.pct-a.pct).forEach(p => { const tr = el('tr');
+    [[p.property],[dfmt(p.last)],[inr(p.total)],[pct(p.pct),p.pct>=.95?'good':p.pct<.5?'bad':'warn'],[inr(p.room)],[inr(p.fnb)],[pct(p.occ),p.occ<p.occ_b-.15?'bad':''],[pct(p.occ_b)],
+     [inr(p.arr)],[inr(p.revpar)],[inr(p.forecast)],[inr(p.day)],[spct(p.day_change),p.day_change==null?'':p.day_change>=0?'good':'bad']]
+     .forEach(c => tr.appendChild(el('td',c[1]||null,c[0]))); tb.appendChild(tr); });
+
+  legend($('#lg-daily'), props.map((p,i)=>({name:p,color:colors[i%colors.length]})));
+  dailyChart($('#ch-daily'), daily, dates, props, colors);
+  weekly($('#weekly tbody'), daily);
+}
+
+fetch('data.json?v=' + Date.now(), {cache:'no-store'}).then(r => r.json()).then(d => {
+  DATA = d;
+  $('#updated').textContent = 'Updated ' + d.generated_at;
+  const months = Array.from(new Set(d.rows.map(r => r.date.slice(0,7)))).sort().reverse();
+  const sel = $('#month'); months.forEach(m => { const o = el('option',null,mfmt(m)); o.value = m; sel.appendChild(o); });
+  sel.addEventListener('change', render);
+  render();
+  let t; window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(render, 150); });
+}).catch(() => { $('#app').innerHTML = ''; $('#app').appendChild(el('div','err','The sales data could not be loaded. Please refresh in a minute.')); });
+})();
+</script>
+</body>
+</html>
