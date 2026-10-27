@@ -335,6 +335,7 @@ function render(){
 }
 
 fetch('data.json?v=' + Date.now(), {cache:'no-store'}).then(r => r.json()).then(d => {
+  d.rows = d.rows.filter(r => r.type !== 'Opening balance');
   DATA = d;
   $('#updated').textContent = 'Updated ' + d.generated_at;
   const months = Array.from(new Set(d.rows.map(r => r.date.slice(0,7)))).sort().reverse();

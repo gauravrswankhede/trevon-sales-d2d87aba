@@ -67,6 +67,8 @@ def main():
             continue
         rec["date"] = d
         rec["type"] = rec.get("type") or "Daily"
+        if rec["type"] == "Opening balance":
+            continue  # year-to-date opening figures; the website shows the current month only
         rows.append(rec)
     rows.sort(key=lambda r: (r["property"], r["date"]))
     ist = timezone(timedelta(hours=5, minutes=30))
