@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Trevon Hotels — P&amp;L Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<script src="../d3.min.js"></script>
+<style>
+:root{
+  --bg:#f6f5f1;--panel:#ffffff;--fg:#1d1f23;--muted:#6b6f76;--line:#e4e2dc;--grid:#eeece6;
+  --c1:#1567a8;--c2:#c8833a;--zero:#9aa0a6;--bad:#b3261e;--ok:#2e7d4f;--warn:#a86400;
+  --pos-1:#d7ebdd;--pos-2:#9fceb0;--pos-3:#5aa57a;--neg-1:#f6dcd8;--neg-2:#eba79f;--neg-3:#d0665b;--nil:#f1f0ec;
+  --tip:#ffffff;--shadow:0 6px 20px rgba(0,0,0,.08);
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"Source Serif 4",Georgia,serif;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#141518;--panel:#1c1e22;--fg:#ecebe7;--muted:#9a9ea6;--line:#2c2f35;--grid:#26292e;
+  --c1:#6aaee0;--c2:#e3a463;--zero:#6b7078;--bad:#f2867c;--ok:#7ccf9b;--warn:#e6b45c;
+  --pos-1:#1f3a2a;--pos-2:#2c5f40;--pos-3:#3f8a5c;--neg-1:#3e2422;--neg-2:#6e3530;--neg-3:#a2463d;--nil:#23262b;
+  --tip:#24272c;--shadow:0 6px 20px rgba(0,0,0,.4);
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.45}
+.wrap{max-width:1240px;margin:0 auto;padding:28px 16px 60px;display:flex;flex-direction:column;gap:28px}
+h1{font-family:var(--serif);font-weight:600;font-size:clamp(26px,3.4vw,36px);margin:0;letter-spacing:-.01em}
+h2{font-size:18px;font-weight:600;margin:0 0 4px}
+h3{font-size:15px;font-weight:600;margin:14px 0 0}
+.meta{color:var(--muted);font-size:13px}
+.take{font-size:17px;margin:10px 0 0;max-width:62rem}
+.take b{font-weight:600}
+.note{color:var(--muted);font-size:13px;margin:6px 0 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:12px}
+.card,.tile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}
+.tile{display:flex;flex-direction:column;gap:4px}
+.lbl{font-size:12.5px;color:var(--muted)}
+.big{font-family:var(--serif);font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+.sub{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:12px}
+.cap{color:var(--muted);font-size:13px;margin:4px 0 0}
+.chart{position:relative;margin-top:10px;min-height:120px}
+.chart svg{display:block;overflow:visible}
+.chart text{font-size:12px;fill:var(--muted);font-family:var(--sans)}
+.chart text.end{fill:var(--fg);font-variant-numeric:tabular-nums}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.tip{position:absolute;pointer-events:none;background:var(--tip);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:6px 10px;font-size:12.5px;white-space:nowrap;display:none;z-index:5}
+.tip .t{color:var(--muted);margin-bottom:2px}
+.tw{overflow:auto;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:right;font-weight:600;color:var(--muted);padding:7px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{text-align:right;padding:8px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+tr.tot td{font-weight:600}
+td.heat{border:2px solid var(--panel);border-radius:6px;color:var(--fg)}
+.good{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.chip{display:inline-block;font-size:11.5px;padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px}
+ul.watch{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+ul.watch b{font-weight:600}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;margin-top:10px}
+.metric{border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.metric h4{margin:0 0 4px;font-size:14px;font-weight:600}
+.metric p{margin:0;font-size:13px;color:var(--muted)}
+.metric .f{font-size:12.5px;color:var(--fg);margin-top:6px;font-variant-numeric:tabular-nums}
+.err{padding:40px;text-align:center;color:var(--muted)}
+footer{color:var(--muted);font-size:12.5px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <h1>Trevon Hotels — profit &amp; loss</h1>
+    <div class="meta" id="updated">Loading…</div>
+    <p class="take" id="take"></p>
+    <p class="note">All money in ₹ lakh (1 lakh = ₹1,00,000). April–September are actuals; October is the accounts team's estimate. Source: Corporate P&amp;L 2026-27 workbook.</p>
+  </header>
+
+  <section class="kpis" id="kpis"></section>
+
+  <section class="card"><h2>What needs attention</h2><ul class="watch" id="watch"></ul></section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Hotel revenue and expenses by month</h2>
+      <p class="cap">All operating hotels, leased and managed. The gap between the lines is the hotels' combined GOP.</p>
+      <div class="chart" id="trend"></div>
+      <div class="legend"><span><i style="background:var(--c1)"></i>Revenue</span><span><i style="background:var(--c2)"></i>Expenses</span><span>Dashed: October estimate</span></div>
+    </div>
+    <div class="card">
+      <h2>Company result by month</h2>
+      <p class="cap">Corporate surplus or deficit: leased-hotel GOP plus management fees and manpower income, minus head-office costs. April–June head-office costs are missing in the workbook, so those bars are incomplete.</p>
+      <div class="chart" id="corpbars"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Hotel scorecard, April–September</h2>
+    <p class="cap">Revenue per room-day is total revenue ÷ (rooms × days open): the simplest like-for-like measure across hotels of different sizes. Expense ratio is expenses ÷ revenue; above 100% means the hotel loses money.</p>
+    <div class="tw"><table id="score"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>GOP by hotel and month</h2>
+    <p class="cap">Green is profit, red is loss; darker means larger. Hover a cell for revenue and expenses.</p>
+    <div class="tw chart" id="heatwrap" style="margin-top:0"><table id="heat"></table></div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Head-office costs</h2>
+      <p class="cap">July–September, the only months with complete figures.</p>
+      <div class="tw"><table id="corpexp"></table></div>
+    </div>
+    <div class="card">
+      <h2>Corporate income</h2>
+      <p class="cap">What the company earns besides leased-hotel GOP.</p>
+      <div class="tw"><table id="corpinc"></table></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Forecast, October 2026 – March 2027</h2>
+    <p class="cap" id="fcap"></p>
+    <div class="tw"><table id="fc"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>This month so far, from the daily sales logs</h2>
+    <p class="cap" id="livecap">Loading…</p>
+    <div class="tw"><table id="live"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>The numbers to run Trevon on</h2>
+    <p class="cap">Grouped by the question each one answers. The first two groups are on this page; the last needs data the workbook doesn't hold yet.</p>
+    <div class="metrics" id="metrics"></div>
+  </section>
+
+  <section class="card">
+    <h2>Gaps in the data</h2>
+    <ul class="watch" id="gaps"></ul>
+  </section>
+
+  <footer id="foot"></footer>
+</div>
+<div class="tip" id="tip"></div>
+<script>
+const MON=["Apr","May","Jun","Jul","Aug","Sep","Oct"];
+const DAYS=[30,31,30,31,31,30,31];
+const FMON=["Oct","Nov","Dec","Jan","Feb","Mar"];
+const L=x=>x==null?"–":(x<0?"−":"")+Math.abs(x).toLocaleString("en-IN",{minimumFractionDigits:1,maximumFractionDigits:1});
+const P=x=>x==null||!isFinite(x)?"–":Math.round(x*100)+"%";
+const R=x=>x==null||!isFinite(x)?"–":"₹"+Math.round(x).toLocaleString("en-IN");
+const sum=a=>a.reduce((s,x)=>s+(x||0),0);
+const has=a=>a&&a.some(x=>x!=null);
+const cls=x=>x==null?"":x<0?"bad":"good";
+const tip=document.getElementById("tip");
+function showTip(ev,html){const r=document.getElementById("app").getBoundingClientRect();tip.innerHTML=html;tip.style.display="block";
+  let x=ev.clientX+12,y=ev.clientY+12;const w=tip.offsetWidth;if(x+w>window.innerWidth-8)x=ev.clientX-w-12;tip.style.left=(x+window.scrollX)+"px";tip.style.top=(y+window.scrollY)+"px";}
+function hideTip(){tip.style.display="none"}
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+fetch("pl.json",{cache:"no-store"}).then(r=>r.json()).then(render).catch(e=>{
+  document.getElementById("app").innerHTML='<div class="err">Could not load the P&amp;L data ('+e.message+').</div>';});
+
+function render(d){
+  document.getElementById("updated").textContent="Updated "+d.generated_at;
+  const A=6; // actual months Apr..Sep = index 0..5; 6 = Oct estimate
+  const units=d.units.map(u=>{
+    const gop=u.rev.map((r,i)=>r==null&&u.exp[i]==null?null:(r||0)-(u.exp[i]||0)-(u.fee?u.fee[i]||0:0));
+    const open=u.rev.slice(0,A).map(r=>r!=null&&r>0);
+    const daysOpen=sum(open.map((o,i)=>o?DAYS[i]:0));
+    const rev=sum(u.rev.slice(0,A)),exp=sum(u.exp.slice(0,A)),fee=u.fee?sum(u.fee.slice(0,A)):0,g=sum(gop.slice(0,A));
+    const months=open.filter(Boolean).length,prof=gop.slice(0,A).filter((x,i)=>open[i]&&x>0).length;
+    const fg=u.f_rev.map((r,i)=>r==null&&u.f_exp[i]==null?null:(r||0)-(u.f_exp[i]||0)-(u.f_fee?u.f_fee[i]||0:0));
+    return {...u,gop,rev6:rev,exp6:exp,fee6:fee,gop6:g,months,prof,daysOpen,
+      revRoomDay:daysOpen?rev*1e5/(u.rooms*daysOpen):null,expRatio:rev?exp/rev:null,fgop:fg,
+      fComplete:u.f_rev.every(x=>x!=null)&&u.f_exp.every(x=>x!=null)};
+  });
+  const live=units.filter(u=>u.months>0);
+  const leased=units.filter(u=>u.model==="Leased"),managed=units.filter(u=>u.model==="Managed");
+  // monthly totals
+  const mRev=MON.map((_,i)=>sum(live.map(u=>u.rev[i]))),mExp=MON.map((_,i)=>sum(live.map(u=>u.exp[i])));
+  const leasedGop=MON.map((_,i)=>sum(leased.map(u=>u.gop[i])));
+  const inc=d.corp.income,ex=d.corp.expense;
+  const incM=MON.map((_,i)=>sum(Object.values(inc).map(a=>a[i])));
+  const expKnown=MON.map((_,i)=>Object.values(ex).every(a=>a[i]!=null));
+  const expM=MON.map((_,i)=>sum(Object.values(ex).map(a=>a[i])));
+  const corpRes=MON.map((_,i)=>leasedGop[i]+incM[i]-expM[i]);
+  const full=[3,4,5]; // Jul-Sep complete
+  const burn=sum(full.map(i=>corpRes[i]))/3;
+  const hoCost=sum(full.map(i=>expM[i]))/3;
+  const totRev=sum(mRev.slice(0,A)),totExp=sum(mExp.slice(0,A));
+  const lRev=sum(leased.map(u=>u.rev6)),lGop=sum(leased.map(u=>u.gop6));
+  const fees=sum(Object.values(inc).map(a=>sum(a.slice(0,A))));
+  const rooms=sum(units.map(u=>u.rooms));
+  const opRooms=sum(units.filter(u=>u.status==="Operative").map(u=>u.rooms));
+
+  // headline
+  const worst=[...live].sort((a,b)=>a.gop6-b.gop6)[0];
+  document.getElementById("take").innerHTML=
+    `From April to September the hotels took <b>₹${L(totRev)} lakh</b> in revenue and spent <b>₹${L(totExp)} lakh</b>. `+
+    `Leased hotels lost <b>₹${L(-lGop)} lakh</b> at GOP level, and in July–September, the months with complete head-office figures, the company ran a deficit of about <b>₹${L(-burn)} lakh a month</b>. `+
+    `${worst.short} is the largest single loss (₹${L(-worst.gop6)} lakh).`;
+
+  // KPIs
+  const k=[
+    ["Hotel revenue, Apr–Sep",L(totRev),`${live.length} hotels trading · ${opRooms} of ${rooms} rooms operative`],
+    ["Leased hotels GOP, Apr–Sep",L(lGop),`margin ${P(lGop/lRev)} on ₹${L(lRev)} L revenue`,lGop<0],
+    ["Company result per month",L(burn),"Jul–Sep average, after head office",burn<0],
+    ["Head-office cost per month",L(hoCost),`${P(hoCost/(sum(full.map(i=>mRev[i]))/3))} of hotel revenue (Jul–Sep)`],
+    ["Fee & manpower income, Apr–Sep",L(fees),"management fees + ATS manpower"],
+    ["Revenue per room-day",R(totRev*1e5/sum(live.map(u=>u.rooms*u.daysOpen))),"all trading hotels, Apr–Sep"],
+  ];
+  document.getElementById("kpis").innerHTML=k.map(([l,b,s,neg])=>
+    `<div class="tile"><div class="lbl">${l}</div><div class="big ${neg?"bad":""}">${b}</div><div class="sub">${s}</div></div>`).join("");
+
+  // watch list
+  const W=[];
+  live.filter(u=>u.gop6<0).sort((a,b)=>a.gop6-b.gop6).forEach(u=>{
+    W.push(`<b>${u.short}</b> lost ₹${L(-u.gop6)} lakh in ${u.months} months (profitable in ${u.prof} of ${u.months}); expenses run at ${P(u.expRatio)} of revenue.`);});
+  const gg=units.find(u=>u.short==="Gurugram");
+  if(gg) W.push(`<b>Gurugram</b> needs about ₹${L(sum(gg.exp.slice(0,A))/6)} lakh a month just to cover costs but has averaged ₹${L(gg.rev6/6)} lakh: either costs come down or revenue rises by about ${P(gg.exp6/gg.rev6-1)}.`);
+  W.push(`Head office costs about <b>₹${L(hoCost)} lakh a month</b>, while fee and manpower income brings in about ₹${L(sum(full.map(i=>incM[i]))/3)} lakh. The hotels' GOP has to cover the difference before the company breaks even.`);
+  const gaps=units.filter(u=>!u.fComplete);
+  if(gaps.length) W.push(`The October–March forecast is missing for <b>${gaps.map(u=>u.short).join(", ")}</b>, so the company-level forecast can't be trusted yet.`);
+  document.getElementById("watch").innerHTML=W.map(x=>`<li>${x}</li>`).join("");
+
+  drawTrend(mRev,mExp);
+  drawCorp(corpRes,expKnown);
+  scoreTable(units,A);
+  heat(units);
+  corpTables(inc,ex,A);
+  forecast(units,d);
+  liveMonth();
+  metrics();
+  gapList(units,expKnown,d);
+  document.getElementById("foot").textContent="Rebuilt with build_pl.py from the Corporate P&L workbook. Live month table reads the same data.json as the sales dashboard.";
+}
+
+function drawTrend(rev,exp){
+  const el=document.getElementById("trend"),W=el.clientWidth||520,H=250,m={t:12,r:70,b:26,l:40};
+  const x=d3.scalePoint().domain(MON).range([m.l,W-m.r]).padding(.3);
+  const y=d3.scaleLinear().domain([0,d3.max([...rev,...exp])*1.12]).nice().range([H-m.b,m.t]);
+  const svg=d3.select(el).append("svg").attr("width",W).attr("height",H).attr("role","img").attr("aria-label","Monthly hotel revenue and expenses");
+  svg.append("g").selectAll("line").data(y.ticks(5)).join("line").attr("x1",m.l).attr("x2",W-m.r).attr("y1",y).attr("y2",y).attr("stroke",css("--grid"));
+  svg.append("g").selectAll("text").data(y.ticks(5)).join("text").attr("x",m.l-8).attr("y",t=>y(t)+4).attr("text-anchor","end").text(t=>t);
+  svg.append("g").selectAll("text").data(MON).join("text").attr("x",x).attr("y",H-6).attr("text-anchor","middle").text(t=>t);
+  [[rev,"--c1","Revenue"],[exp,"--c2","Expenses"]].forEach(([s,c,n])=>{
+    const ln=d3.line().x((_,i)=>x(MON[i])).y(v=>y(v));
+    svg.append("path").attr("d",ln(s.slice(0,6))).attr("fill","none").attr("stroke",css(c)).attr("stroke-width",2);
+    svg.append("path").attr("d",ln.x((_,i)=>x(MON[i+5]))(s.slice(5))).attr("fill","none").attr("stroke",css(c)).attr("stroke-width",2).attr("stroke-dasharray","4 4");
+    svg.append("g").selectAll("circle").data(s).join("circle").attr("cx",(_,i)=>x(MON[i])).attr("cy",y).attr("r",4).attr("fill",css(c)).attr("stroke",css("--panel")).attr("stroke-width",2);
+  });
+  const ly=[y(rev[6]),y(exp[6])];if(Math.abs(ly[0]-ly[1])<14){const mid=(ly[0]+ly[1])/2,up=rev[6]>=exp[6];ly[0]=mid+(up?-8:8);ly[1]=mid+(up?8:-8);}
+  [["Revenue",ly[0]],["Expenses",ly[1]]].forEach(([n,yy])=>svg.append("text").attr("class","end").attr("x",x(MON[6])+10).attr("y",yy+4).text(n));
+  const hl=svg.append("line").attr("y1",m.t).attr("y2",H-m.b).attr("stroke",css("--muted")).attr("stroke-dasharray","2 3").style("display","none");
+  svg.append("rect").attr("x",m.l).attr("y",m.t).attr("width",W-m.l-m.r).attr("height",H-m.t-m.b).attr("fill","transparent")
+    .on("mousemove",ev=>{const px=d3.pointer(ev)[0];let i=d3.minIndex(MON,mm=>Math.abs(x(mm)-px));hl.attr("x1",x(MON[i])).attr("x2",x(MON[i])).style("display",null);
+      showTip(ev,`<div class="t">${MON[i]} 2026${i===6?" (estimate)":""}</div>Revenue ${L(rev[i])}<br>Expenses ${L(exp[i])}<br>GOP <b>${L(rev[i]-exp[i])}</b>`);})
+    .on("mouseleave",()=>{hl.style("display","none");hideTip();});
+}
+
+function drawCorp(res,known){
+  const el=document.getElementById("corpbars"),W=el.clientWidth||520,H=250,m={t:16,r:12,b:26,l:40};
+  const x=d3.scaleBand().domain(MON).range([m.l,W-m.r]).padding(.35);
+  const ext=d3.extent([...res,0]);const y=d3.scaleLinear().domain([ext[0]*1.15,Math.max(ext[1],0)*1.15+1]).nice().range([H-m.b,m.t]);
+  const svg=d3.select(el).append("svg").attr("width",W).attr("height",H).attr("role","img").attr("aria-label","Monthly company surplus or deficit");
+  svg.append("g").selectAll("line").data(y.ticks(5)).join("line").attr("x1",m.l).attr("x2",W-m.r).attr("y1",y).attr("y2",y).attr("stroke",css("--grid"));
+  svg.append("g").selectAll("text").data(y.ticks(5)).join("text").attr("x",m.l-8).attr("y",t=>y(t)+4).attr("text-anchor","end").text(t=>t);
+  svg.append("line").attr("x1",m.l).attr("x2",W-m.r).attr("y1",y(0)).attr("y2",y(0)).attr("stroke",css("--zero"));
+  svg.append("g").selectAll("text").data(MON).join("text").attr("x",t=>x(t)+x.bandwidth()/2).attr("y",H-6).attr("text-anchor","middle").text(t=>t);
+  const bw=Math.min(x.bandwidth(),36);
+  svg.append("g").selectAll("path").data(res).join("path").attr("d",(v,i)=>{
+      const x0=x(MON[i])+(x.bandwidth()-bw)/2,y0=y(0),y1=y(v),r=Math.min(4,Math.abs(y1-y0));
+      return v<0?`M${x0},${y0}V${y1-r}Q${x0},${y1} ${x0+r},${y1}H${x0+bw-r}Q${x0+bw},${y1} ${x0+bw},${y1-r}V${y0}Z`
+                :`M${x0},${y0}V${y1+r}Q${x0},${y1} ${x0+r},${y1}H${x0+bw-r}Q${x0+bw},${y1} ${x0+bw},${y1+r}V${y0}Z`;})
+    .attr("fill",(v,i)=>known[i]?css(v<0?"--bad":"--ok"):css("--zero")).attr("opacity",(v,i)=>i===6?.6:1)
+    .on("mousemove",(ev,v)=>{const i=res.indexOf(v);showTip(ev,`<div class="t">${MON[i]} 2026${i===6?" (estimate)":""}</div>Result <b>${L(v)}</b>${known[i]?"":"<br>Head-office costs incomplete"}`);})
+    .on("mouseleave",hideTip);
+  svg.append("g").selectAll("text").data(res).join("text").attr("class","end").attr("x",(_,i)=>x(MON[i])+x.bandwidth()/2).attr("y",v=>v<0?y(v)+14:y(v)-5)
+    .attr("text-anchor","middle").text((v,i)=>known[i]?L(v):"");
+  const lg=document.createElement("div");lg.className="legend";
+  lg.innerHTML=`<span><i style="background:var(--bad)"></i>Deficit</span><span><i style="background:var(--zero)"></i>Head-office costs missing</span><span>Faded: October estimate</span>`;
+  el.after(lg);
+}
+
+function scoreTable(units,A){
+  const rows=units.filter(u=>u.months>0).sort((a,b)=>b.gop6-a.gop6);
+  const tot={rev:sum(rows.map(u=>u.rev6)),exp:sum(rows.map(u=>u.exp6)),fee:sum(rows.map(u=>u.fee6)),gop:sum(rows.map(u=>u.gop6))};
+  let h=`<tr><th>Hotel</th><th>Model</th><th>Rooms</th><th>Months</th><th>Revenue</th><th>Expenses</th><th>Fees to Trevon</th><th>GOP</th><th>GOP margin</th><th>Expense ratio</th><th>Revenue per room-day</th><th>Profitable months</th><th>Oct est. GOP</th></tr>`;
+  rows.forEach(u=>{h+=`<tr><td>${u.short}${u.status!=="Operative"?`<span class="chip">${u.status}</span>`:""}</td><td>${u.model}</td><td>${u.rooms}</td><td>${u.months}</td>
+    <td>${L(u.rev6)}</td><td>${L(u.exp6)}</td><td>${u.model==="Managed"?L(u.fee6):"–"}</td><td class="${cls(u.gop6)}">${L(u.gop6)}</td>
+    <td class="${cls(u.gop6)}">${P(u.gop6/u.rev6)}</td><td class="${u.expRatio>1?"bad":""}">${P(u.expRatio)}</td><td>${R(u.revRoomDay)}</td>
+    <td>${u.prof} of ${u.months}</td><td class="${cls(u.gop[6])}">${L(u.gop[6])}</td></tr>`;});
+  h+=`<tr class="tot"><td>All trading hotels</td><td></td><td>${sum(rows.map(u=>u.rooms))}</td><td></td><td>${L(tot.rev)}</td><td>${L(tot.exp)}</td><td>${L(tot.fee)}</td><td class="${cls(tot.gop)}">${L(tot.gop)}</td><td class="${cls(tot.gop)}">${P(tot.gop/tot.rev)}</td><td>${P(tot.exp/tot.rev)}</td><td></td><td></td><td>${L(sum(rows.map(u=>u.gop[6])))}</td></tr>`;
+  document.getElementById("score").innerHTML=h;
+}
+
+function heat(units){
+  const rows=units.filter(u=>u.months>0);
+  const mx=d3.max(rows.flatMap(u=>u.gop.map(v=>Math.abs(v||0))));
+  const col=v=>{if(v==null)return css("--nil");const t=Math.abs(v)/mx,s=v<0?"neg":"pos";return css(`--${s}-${t>.5?3:t>.2?2:1}`);};
+  let h=`<tr><th>Hotel</th>${MON.map((m,i)=>`<th>${m}${i===6?" est.":""}</th>`).join("")}<th>Apr–Sep</th></tr>`;
+  rows.forEach(u=>{h+=`<tr><td>${u.short}</td>${u.gop.map((v,i)=>`<td class="heat" data-u="${u.short}" data-i="${i}" style="background:${col(v)}">${L(v)}</td>`).join("")}<td class="${cls(u.gop6)}"><b>${L(u.gop6)}</b></td></tr>`;});
+  const t=document.getElementById("heat");t.innerHTML=h;
+  t.querySelectorAll("td.heat").forEach(td=>{const u=rows.find(r=>r.short===td.dataset.u),i=+td.dataset.i;
+    td.addEventListener("mousemove",ev=>showTip(ev,`<div class="t">${u.short}, ${MON[i]}</div>Revenue ${L(u.rev[i])}<br>Expenses ${L(u.exp[i])}${u.fee?`<br>Fees ${L(u.fee[i])}`:""}<br>GOP <b>${L(u.gop[i])}</b>`));
+    td.addEventListener("mouseleave",hideTip);});
+}
+
+function corpTables(inc,ex,A){
+  const idx=[3,4,5];
+  let h=`<tr><th>Cost</th><th>Jul</th><th>Aug</th><th>Sep</th><th>Avg / month</th><th>Share</th></tr>`;
+  const tot=sum(Object.values(ex).map(a=>sum(idx.map(i=>a[i]))));
+  Object.entries(ex).sort((a,b)=>sum(idx.map(i=>b[1][i]))-sum(idx.map(i=>a[1][i]))).forEach(([k,a])=>{
+    const s=sum(idx.map(i=>a[i]));h+=`<tr><td>${k}</td>${idx.map(i=>`<td>${L(a[i])}</td>`).join("")}<td>${L(s/3)}</td><td>${P(s/tot)}</td></tr>`;});
+  h+=`<tr class="tot"><td>Total</td>${idx.map(i=>`<td>${L(sum(Object.values(ex).map(a=>a[i])))}</td>`).join("")}<td>${L(tot/3)}</td><td>100%</td></tr>`;
+  document.getElementById("corpexp").innerHTML=h;
+  let g=`<tr><th>Income</th>${MON.slice(0,6).map(m=>`<th>${m}</th>`).join("")}<th>Apr–Sep</th></tr>`;
+  Object.entries(inc).forEach(([k,a])=>{g+=`<tr><td>${k}</td>${a.slice(0,6).map(v=>`<td>${L(v)}</td>`).join("")}<td>${L(sum(a.slice(0,6)))}</td></tr>`;});
+  g+=`<tr class="tot"><td>Total</td>${MON.slice(0,6).map((_,i)=>`<td>${L(sum(Object.values(inc).map(a=>a[i])))}</td>`).join("")}<td>${L(sum(Object.values(inc).map(a=>sum(a.slice(0,6)))))}</td></tr>`;
+  document.getElementById("corpinc").innerHTML=g;
+}
+
+function forecast(units,d){
+  const rows=units.filter(u=>u.status==="Operative"||has(u.f_rev));
+  let h=`<tr><th>Hotel</th><th>Measure</th>${FMON.map(m=>`<th>${m}</th>`).join("")}<th>6 months</th><th>Apr–Sep actual, same measure</th></tr>`;
+  rows.forEach(u=>{
+    const ok=u.fComplete;
+    const r1=u.f_rev.map(v=>`<td>${ok||v!=null?L(v):"–"}</td>`).join(""),r2=u.fgop.map(v=>`<td class="${ok?cls(v):""}">${ok?L(v):"–"}</td>`).join("");
+    h+=`<tr><td rowspan="2">${u.short}${ok?"":'<span class="chip">no forecast</span>'}</td><td>Revenue</td>${r1}<td>${ok?L(sum(u.f_rev)):"–"}</td><td>${u.months?L(u.rev6):"–"}</td></tr>`;
+    h+=`<tr><td>GOP</td>${r2}<td class="${ok?cls(sum(u.fgop)):""}"><b>${ok?L(sum(u.fgop)):"–"}</b></td><td class="${cls(u.months?u.gop6:null)}">${u.months?L(u.gop6):"–"}</td></tr>`;});
+  document.getElementById("fc").innerHTML=h;
+  const miss=units.filter(u=>!u.fComplete).map(u=>u.short);
+  document.getElementById("fcap").textContent=`From the 'Estimated P&L' and 'Projections' tabs. ${miss.length?`No forecast yet for ${miss.join(", ")}: those figures came from a linked file the workbook can't reach.`:""} Head office is budgeted at ₹${L(d.forecast.corp_exp[0])} lakh a month.`;
+}
+
+function liveMonth(){
+  fetch("../data.json",{cache:"no-store"}).then(r=>r.json()).then(s=>{
+    const rows=s.rows.filter(r=>r.type==="Daily");
+    const month=d3.max(rows,r=>r.date.slice(0,7));
+    const cur=rows.filter(r=>r.date.slice(0,7)===month);
+    const by=d3.groups(cur,r=>r.property).map(([p,a])=>{const av=sum(a.map(r=>r.avail)),sold=sum(a.map(r=>r.sold)),room=sum(a.map(r=>r.room)),tot=sum(a.map(r=>r.room+r.restaurant+r.ird+r.plans+r.banquet+r.bar+r.venue+r.other));
+      return {p,days:a.length,last:d3.max(a,r=>r.date),occ:av?sold/av:null,arr:sold?room/sold:null,revpar:av?room/av:null,tot,trev:av?tot/av:null};}).sort((a,b)=>(b.revpar||0)-(a.revpar||0));
+    const label=new Date(month+"-01").toLocaleString("en-IN",{month:"long",year:"numeric"});
+    document.getElementById("livecap").textContent=`${label}, days logged so far. Occupancy = rooms sold ÷ rooms available; ARR = room revenue ÷ rooms sold; RevPAR = room revenue ÷ rooms available. Figures in rupees.`;
+    let h=`<tr><th>Hotel</th><th>Days logged</th><th>Last day</th><th>Occupancy</th><th>ARR</th><th>RevPAR</th><th>Total revenue per available room</th><th>Total revenue</th></tr>`;
+    by.forEach(r=>{h+=`<tr><td>${r.p}</td><td>${r.days}</td><td>${r.last.slice(8)}-${r.last.slice(5,7)}</td><td>${P(r.occ)}</td><td>${R(r.arr)}</td><td>${R(r.revpar)}</td><td>${R(r.trev)}</td><td>${R(r.tot)}</td></tr>`;});
+    document.getElementById("live").innerHTML=h;
+  }).catch(()=>{document.getElementById("livecap").textContent="Daily sales data could not be loaded.";});
+}
+
+function metrics(){
+  const M=[
+    ["Is each hotel making money?","GOP and GOP margin","Revenue minus the hotel's own operating costs, before head office. Healthy mid-market hotels run 25–40%. Anything negative for three months in a row needs a plan.","GOP = Revenue − Expenses; margin = GOP ÷ Revenue"],
+    ["Is each hotel making money?","Expense ratio and cost per occupied room","Shows whether a loss is a cost problem or a sales problem. Track payroll, food cost, power and lease separately once the monthly P&L splits them.","Expenses ÷ Revenue; Expenses ÷ rooms sold"],
+    ["Is the company covering its overhead?","Company surplus/deficit and monthly cash burn","Leased GOP + fees + manpower income − head office. This is the number that tells you how long current funding lasts.","Corporate P&L row 21"],
+    ["Is the company covering its overhead?","Head office as % of hotel revenue","At ₹13–16 L a month, head office is large relative to the portfolio. Watch this fall as hotels are added.","Head-office cost ÷ total hotel revenue"],
+    ["Are we selling rooms well?","Occupancy, ARR, RevPAR","The three standard hotel sales numbers, by hotel, every day. RevPAR combines the other two and is the fairest way to compare hotels.","From the daily sales logs (table above)"],
+    ["Are we selling rooms well?","TRevPAR / revenue per room-day","Like RevPAR but includes food, banquets and other income: right for hotels like Haldwani and Dhanbad where restaurant sales are large.","Total revenue ÷ rooms available"],
+    ["Are we on plan?","Actual vs budget and vs forecast","Each month, per hotel: revenue, GOP and occupancy against budget. The daily logs already hold the budgets; the P&L workbook needs a budget row per hotel.","Variance = Actual − Budget"],
+    ["Are we on plan?","Break-even revenue per hotel","Revenue a hotel needs each month to cover its costs. Gives each GM a single target.","≈ monthly expenses at current cost levels"],
+    ["Needs new data","Channel mix and commission","Share of room-nights from OTA, direct, corporate and walk-in, and what the OTA commission costs. Rising direct share is the cheapest margin gain.","Needs a channel field in the daily log or the PMS report"],
+    ["Needs new data","Guest rating and review count","Google and OTA rating per hotel, tracked monthly. It moves ARR and conversion. The Trevon Tracker already logs review routines.","From GMB / OTA extranets"],
+    ["Needs new data","Receivables and cash in bank","Corporate and travel-agent dues by age, plus cash position, so a profitable month doesn't hide a cash squeeze.","Needs an accounts extract"],
+    ["Needs new data","Pre-opening spend vs plan","Gwalior, Dhanbad and Chakrata spend and opening dates against plan.","Corporate P&L rows 24–28 plus a plan"],
+  ];
+  document.getElementById("metrics").innerHTML=M.map(([g,t,p,f])=>`<div class="metric"><div class="lbl">${g}</div><h4>${t}</h4><p>${p}</p><div class="f">${f}</div></div>`).join("");
+}
+
+function gapList(units,known,d){
+  const G=[];
+  const miss=MON.filter((_,i)=>i<6&&!known[i]);
+  if(miss.length) G.push(`<b>Head-office costs for ${miss.join(", ")}</b>: salary, ATS manpower, office expenses and laptop rental were linked to another Excel file that isn't in Drive. They are now yellow input cells in the fixed workbook.`);
+  const nf=units.filter(u=>!u.fComplete).map(u=>u.short);
+  if(nf.length) G.push(`<b>October–March forecast for ${nf.join(", ")}</b>: linked to the OneDrive budget master sheet, which the workbook can't reach.`);
+  G.push(`<b>Pre-opening costs for Ranchi and Gwalior (April–May)</b>: same broken link.`);
+  G.push(`<b>October and November actuals</b>: not in the workbook yet. When you add them, the page picks them up after the next rebuild.`);
+  G.push(`<b>Dhanbad</b> is listed as pre-opening with no P&amp;L figures, though its daily sales log shows it trading since October.`);
+  document.getElementById("gaps").innerHTML=G.map(x=>`<li>${x}</li>`).join("");
+}
+</script>
+</body>
+</html>
