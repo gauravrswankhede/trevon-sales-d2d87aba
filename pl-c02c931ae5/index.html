@@ -90,7 +90,7 @@ footer{color:var(--muted);font-size:12.5px}
     </div>
     <div class="card">
       <h2>Company result by month</h2>
-      <p class="cap">Corporate surplus or deficit: leased-hotel GOP plus management fees and manpower income, minus head-office costs. April–June head-office costs are missing in the workbook, so those bars are incomplete.</p>
+      <p class="cap" id="corpcap">Corporate surplus or deficit: leased-hotel GOP plus management fees and manpower income, minus head-office costs.</p>
       <div class="chart" id="corpbars"></div>
     </div>
   </section>
@@ -110,7 +110,7 @@ footer{color:var(--muted);font-size:12.5px}
   <section class="grid2">
     <div class="card">
       <h2>Head-office costs</h2>
-      <p class="cap">July–September, the only months with complete figures.</p>
+      <p class="cap" id="hocap"></p>
       <div class="tw"><table id="corpexp"></table></div>
     </div>
     <div class="card">
@@ -189,9 +189,11 @@ function render(d){
   const expKnown=MON.map((_,i)=>Object.values(ex).every(a=>a[i]!=null));
   const expM=MON.map((_,i)=>sum(Object.values(ex).map(a=>a[i])));
   const corpRes=MON.map((_,i)=>leasedGop[i]+incM[i]-expM[i]);
-  const full=[3,4,5]; // Jul-Sep complete
-  const burn=sum(full.map(i=>corpRes[i]))/3;
-  const hoCost=sum(full.map(i=>expM[i]))/3;
+  let full=[0,1,2,3,4,5].filter(i=>expKnown[i]); if(!full.length) full=[3,4,5]; // months with complete head-office figures
+  const nF=full.length,fullLbl=nF===6?"Apr–Sep":`${MON[full[0]]}–${MON[full[nF-1]]}`;
+  const burn=sum(full.map(i=>corpRes[i]))/nF;
+  const hoCost=sum(full.map(i=>expM[i]))/nF;
+  if(nF<6) document.getElementById("corpcap").textContent+=` Head-office costs for ${MON.filter((_,i)=>i<6&&!expKnown[i]).join(", ")} are missing in the workbook, so those bars are incomplete.`;
   const totRev=sum(mRev.slice(0,A)),totExp=sum(mExp.slice(0,A));
   const lRev=sum(leased.map(u=>u.rev6)),lGop=sum(leased.map(u=>u.gop6));
   const fees=sum(Object.values(inc).map(a=>sum(a.slice(0,A))));
@@ -202,15 +204,15 @@ function render(d){
   const worst=[...live].sort((a,b)=>a.gop6-b.gop6)[0];
   document.getElementById("take").innerHTML=
     `From April to September the hotels took <b>₹${L(totRev)} lakh</b> in revenue and spent <b>₹${L(totExp)} lakh</b>. `+
-    `Leased hotels lost <b>₹${L(-lGop)} lakh</b> at GOP level, and in July–September, the months with complete head-office figures, the company ran a deficit of about <b>₹${L(-burn)} lakh a month</b>. `+
+    `Leased hotels lost <b>₹${L(-lGop)} lakh</b> at GOP level, ${nF===6?"and across April–September":`and in ${fullLbl}, the months with complete head-office figures,`} the company ran ${burn<0?"a deficit":"a surplus"} of about <b>₹${L(Math.abs(burn))} lakh a month</b>. `+
     `${worst.short} is the largest single loss (₹${L(-worst.gop6)} lakh).`;
 
   // KPIs
   const k=[
     ["Hotel revenue, Apr–Sep",L(totRev),`${live.length} hotels trading · ${opRooms} of ${rooms} rooms operative`],
     ["Leased hotels GOP, Apr–Sep",L(lGop),`margin ${P(lGop/lRev)} on ₹${L(lRev)} L revenue`,lGop<0],
-    ["Company result per month",L(burn),"Jul–Sep average, after head office",burn<0],
-    ["Head-office cost per month",L(hoCost),`${P(hoCost/(sum(full.map(i=>mRev[i]))/3))} of hotel revenue (Jul–Sep)`],
+    ["Company result per month",L(burn),`${fullLbl} average, after head office`,burn<0],
+    ["Head-office cost per month",L(hoCost),`${P(hoCost/(sum(full.map(i=>mRev[i]))/nF))} of hotel revenue (${fullLbl})`],
     ["Fee & manpower income, Apr–Sep",L(fees),"management fees + ATS manpower"],
     ["Revenue per room-day",R(totRev*1e5/sum(live.map(u=>u.rooms*u.daysOpen))),"all trading hotels, Apr–Sep"],
   ];
@@ -223,7 +225,7 @@ function render(d){
     W.push(`<b>${u.short}</b> lost ₹${L(-u.gop6)} lakh in ${u.months} months (profitable in ${u.prof} of ${u.months}); expenses run at ${P(u.expRatio)} of revenue.`);});
   const gg=units.find(u=>u.short==="Gurugram");
   if(gg) W.push(`<b>Gurugram</b> needs about ₹${L(sum(gg.exp.slice(0,A))/6)} lakh a month just to cover costs but has averaged ₹${L(gg.rev6/6)} lakh: either costs come down or revenue rises by about ${P(gg.exp6/gg.rev6-1)}.`);
-  W.push(`Head office costs about <b>₹${L(hoCost)} lakh a month</b>, while fee and manpower income brings in about ₹${L(sum(full.map(i=>incM[i]))/3)} lakh. The hotels' GOP has to cover the difference before the company breaks even.`);
+  W.push(`Head office costs about <b>₹${L(hoCost)} lakh a month</b>, while fee and manpower income brings in about ₹${L(sum(full.map(i=>incM[i]))/nF)} lakh. The hotels' GOP has to cover the difference before the company breaks even.`);
   const gaps=units.filter(u=>!u.fComplete);
   if(gaps.length) W.push(`The October–March forecast is missing for <b>${gaps.map(u=>u.short).join(", ")}</b>, so the company-level forecast can't be trusted yet.`);
   document.getElementById("watch").innerHTML=W.map(x=>`<li>${x}</li>`).join("");
@@ -283,7 +285,7 @@ function drawCorp(res,known){
   svg.append("g").selectAll("text").data(res).join("text").attr("class","end").attr("x",(_,i)=>x(MON[i])+x.bandwidth()/2).attr("y",v=>v<0?y(v)+14:y(v)-5)
     .attr("text-anchor","middle").text((v,i)=>known[i]?L(v):"");
   const lg=document.createElement("div");lg.className="legend";
-  lg.innerHTML=`<span><i style="background:var(--bad)"></i>Deficit</span><span><i style="background:var(--zero)"></i>Head-office costs missing</span><span>Faded: October estimate</span>`;
+  lg.innerHTML=`<span><i style="background:var(--bad)"></i>Deficit</span>${known.slice(0,6).every(Boolean)?"":'<span><i style="background:var(--zero)"></i>Head-office costs missing</span>'}<span>Faded: October estimate</span>`;
   el.after(lg);
 }
 
@@ -312,12 +314,14 @@ function heat(units){
 }
 
 function corpTables(inc,ex,A){
-  const idx=[3,4,5];
-  let h=`<tr><th>Cost</th><th>Jul</th><th>Aug</th><th>Sep</th><th>Avg / month</th><th>Share</th></tr>`;
+  let idx=[0,1,2,3,4,5].filter(i=>Object.values(ex).every(a=>a[i]!=null)); if(!idx.length) idx=[3,4,5];
+  const n=idx.length;
+  document.getElementById("hocap").textContent=n===6?"April–September actuals.":`${MON[idx[0]]}–${MON[idx[n-1]]}, the only months with complete figures.`;
+  let h=`<tr><th>Cost</th>${idx.map(i=>`<th>${MON[i]}</th>`).join("")}<th>Avg / month</th><th>Share</th></tr>`;
   const tot=sum(Object.values(ex).map(a=>sum(idx.map(i=>a[i]))));
   Object.entries(ex).sort((a,b)=>sum(idx.map(i=>b[1][i]))-sum(idx.map(i=>a[1][i]))).forEach(([k,a])=>{
-    const s=sum(idx.map(i=>a[i]));h+=`<tr><td>${k}</td>${idx.map(i=>`<td>${L(a[i])}</td>`).join("")}<td>${L(s/3)}</td><td>${P(s/tot)}</td></tr>`;});
-  h+=`<tr class="tot"><td>Total</td>${idx.map(i=>`<td>${L(sum(Object.values(ex).map(a=>a[i])))}</td>`).join("")}<td>${L(tot/3)}</td><td>100%</td></tr>`;
+    const s=sum(idx.map(i=>a[i]));h+=`<tr><td>${k}</td>${idx.map(i=>`<td>${L(a[i])}</td>`).join("")}<td>${L(s/n)}</td><td>${P(s/tot)}</td></tr>`;});
+  h+=`<tr class="tot"><td>Total</td>${idx.map(i=>`<td>${L(sum(Object.values(ex).map(a=>a[i])))}</td>`).join("")}<td>${L(tot/n)}</td><td>100%</td></tr>`;
   document.getElementById("corpexp").innerHTML=h;
   let g=`<tr><th>Income</th>${MON.slice(0,6).map(m=>`<th>${m}</th>`).join("")}<th>Apr–Sep</th></tr>`;
   Object.entries(inc).forEach(([k,a])=>{g+=`<tr><td>${k}</td>${a.slice(0,6).map(v=>`<td>${L(v)}</td>`).join("")}<td>${L(sum(a.slice(0,6)))}</td></tr>`;});
@@ -377,7 +381,8 @@ function gapList(units,known,d){
   if(miss.length) G.push(`<b>Head-office costs for ${miss.join(", ")}</b>: salary, ATS manpower, office expenses and laptop rental were linked to another Excel file that isn't in Drive. They are now yellow input cells in the fixed workbook.`);
   const nf=units.filter(u=>!u.fComplete).map(u=>u.short);
   if(nf.length) G.push(`<b>October–March forecast for ${nf.join(", ")}</b>: linked to the OneDrive budget master sheet, which the workbook can't reach.`);
-  G.push(`<b>Pre-opening costs for Ranchi and Gwalior (April–May)</b>: same broken link.`);
+  const po=Object.entries(d.corp.preopening).filter(([k,a])=>a.slice(0,2).some(x=>x==null)&&k!=="Claire, Gurugram").map(([k])=>k);
+  if(po.length) G.push(`<b>Pre-opening costs for ${po.join(" and ")} (April–May)</b>: same broken link.`);
   G.push(`<b>October and November actuals</b>: not in the workbook yet. When you add them, the page picks them up after the next rebuild.`);
   G.push(`<b>Dhanbad</b> is listed as pre-opening with no P&amp;L figures, though its daily sales log shows it trading since October.`);
   document.getElementById("gaps").innerHTML=G.map(x=>`<li>${x}</li>`).join("");
