@@ -11,13 +11,13 @@
 <style>
 :root{
   --bg:#f6f5f1;--panel:#ffffff;--fg:#1d1f23;--muted:#6b6f76;--line:#e4e2dc;--grid:#eeece6;
-  --c1:#1f5f8b;--c2:#c8833a;--c3:#7a8f5a;--muted-bar:#c9ccd1;--bad:#b3261e;--ok:#2e7d4f;--warn:#a86400;
+  --c1:#1f5f8b;--c2:#c8833a;--c3:#7a8f5a;--exp:#8a8f98;--muted-bar:#c9ccd1;--bad:#b3261e;--ok:#2e7d4f;--warn:#a86400;
   --tip:#ffffff;--shadow:0 6px 20px rgba(0,0,0,.08);
   --sans:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;--serif:"Source Serif 4",Georgia,serif;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#141518;--panel:#1c1e22;--fg:#ecebe7;--muted:#9a9ea6;--line:#2c2f35;--grid:#26292e;
-  --c1:#6aaee0;--c2:#e3a463;--c3:#a7bd84;--muted-bar:#4a4e56;--bad:#f2867c;--ok:#7ccf9b;--warn:#e6b45c;
+  --c1:#6aaee0;--c2:#e3a463;--c3:#a7bd84;--exp:#8b9099;--muted-bar:#4a4e56;--bad:#f2867c;--ok:#7ccf9b;--warn:#e6b45c;
   --tip:#24272c;--shadow:0 6px 20px rgba(0,0,0,.4);
 }}
 *{box-sizing:border-box}
@@ -61,6 +61,14 @@ td.late{color:var(--bad);background:color-mix(in srgb,var(--bad) 16%,transparent
 .note .late{color:var(--bad);font-weight:600}
 ul.watch{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 ul.watch b{font-weight:600}
+
+.plgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,370px),1fr));gap:12px;margin-top:12px}
+.plcard h3 .sub{font-weight:400;margin-left:6px}
+.plnow{margin-top:10px;font-size:13.5px}
+.plnow b{font-weight:600}
+.plytd{margin-top:8px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.plytd b{color:var(--fg);font-weight:600}
+.legend i.faint{opacity:.4}
 .err{padding:40px;text-align:center;color:var(--muted)}
 footer{color:var(--muted);font-size:12.5px}
 </style>
@@ -97,6 +105,15 @@ footer{color:var(--muted);font-size:12.5px}
     <div class="tw"><table id="score"><thead><tr><th>Property</th><th>Latest day</th><th>Revenue MTD</th><th>% of budget</th><th>Rooms MTD</th><th>F&amp;B MTD</th><th>Occupancy</th><th>Occ. budget</th><th>ARR</th><th>RevPAR</th><th>Month forecast</th><th>Latest day revenue</th><th>vs day before</th></tr></thead><tbody></tbody></table></div>
   </section>
 
+
+  <section class="card" id="pl-sec">
+    <h2>Revenue vs expenditure by property</h2>
+    <p class="cap" id="pl-cap">From the Corporate P&amp;L 2026-27, in ₹ lakh.</p>
+    <div class="legend" id="lg-pl"></div>
+    <div class="plgrid" id="pl-cards"></div>
+    <div class="tw"><table id="pl-table"><thead><tr><th>Property</th><th>Revenue Apr–Oct</th><th>Expenditure Apr–Oct</th><th>Result Apr–Oct</th><th>Expenditure ÷ revenue</th><th id="pl-th-plan">Planned expenditure</th><th id="pl-th-so">Revenue so far</th><th>Costs covered so far</th><th>Month-end at current pace</th><th>vs planned expenditure</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
   <section>
     <h2>Daily and weekly sales</h2>
     <div class="grid2">
@@ -121,7 +138,7 @@ footer{color:var(--muted);font-size:12.5px}
     </div>
   </section>
 
-  <footer id="foot">Figures come from each property's Daily Sales Log in Google Drive and refresh every day at 12:07 pm and 9:07 pm IST. Month-to-date totals come from each hotel's latest Daily Revenue Report.</footer>
+  <footer id="foot">Figures come from each property's Daily Sales Log in Google Drive and refresh every day at 12:07 pm and 9:07 pm IST. Month-to-date totals come from each hotel's latest Daily Revenue Report. Revenue vs expenditure comes from the Corporate P&amp;L 2026-27 workbook in Google Drive.</footer>
 </div>
 
 <script>
@@ -293,6 +310,117 @@ function weekly(tbody, daily){
     tbody.appendChild(tr); });
 }
 
+
+// ---- Revenue vs expenditure (Corporate P&L, Rs. lakh) ----
+const fl = (v) => (v == null || !isFinite(v)) ? '—' : '₹' + (Math.abs(v) >= 100 ? Math.round(v) : v.toFixed(1)) + ' L';
+const res = (v) => v == null ? {t:'—', c:null} : v >= 0 ? {t:'Surplus ' + fl(v), c:'good'} : {t:'Loss ' + fl(-v), c:'bad'};
+function plSeries(u, pl){
+  const months = pl.months.concat(pl.f_months.slice(1));
+  const add = (a,b) => (a == null && b == null) ? null : (a||0) + (b||0);
+  return months.map((m,i) => {
+    const a = i < pl.months.length;
+    const rev = a ? u.rev[i] : (u.f_rev||[])[i - pl.months.length + 1];
+    const exp = a ? u.exp[i] : (u.f_exp||[])[i - pl.months.length + 1];
+    const fee = a ? (u.fee||[])[i] : (u.f_fee||[])[i - pl.months.length + 1];
+    return {m, rev: rev == null ? null : rev, exp: add(exp, u.model === 'Managed' ? fee : null), fee: u.model === 'Managed' ? fee : null,
+      kind: i < pl.estimate_from ? 'actual' : i === pl.estimate_from ? 'estimate' : 'plan'};
+  });
+}
+function plMini(box, ser, cur, soFar){
+  box.innerHTML = '';
+  const W = Math.max(300, box.clientWidth), H = 150, m = {t:8, r:4, b:22, l:44};
+  const svg = d3.select(box).append('svg').attr('width','100%').attr('viewBox',`0 0 ${W} ${H}`).attr('height',H);
+  const x = d3.scaleBand(ser.map(d=>d.m),[m.l,W-m.r]).paddingInner(.28).paddingOuter(.1);
+  const xi = d3.scaleBand(['rev','exp'],[0,x.bandwidth()]).padding(.08);
+  const y = d3.scaleLinear([0, d3.max(ser, d=>Math.max(d.rev||0, d.exp||0, d.m===cur ? soFar||0 : 0)) || 1],[H-m.b,m.t]).nice();
+  const yt = y.ticks(3);
+  svg.append('g').selectAll('line').data(yt).join('line').attr('x1',m.l).attr('x2',W-m.r).attr('y1',d=>y(d)).attr('y2',d=>y(d)).attr('stroke',css('--grid'));
+  svg.append('g').selectAll('text').data(yt).join('text').attr('x',m.l-6).attr('y',d=>y(d)).attr('dy','.35em').attr('text-anchor','end').text(d=>'₹'+d+' L');
+  svg.append('g').selectAll('text').data(ser).join('text').attr('x',d=>x(d.m)+x.bandwidth()/2).attr('y',H-6).attr('text-anchor','middle')
+    .attr('font-weight',d=>d.m===cur?600:null).text(d=>d3.utcFormat('%b')(new Date(d.m+'-01T00:00:00Z')).slice(0,1));
+  const op = d => d.kind === 'actual' ? 1 : d.kind === 'estimate' ? .7 : .38;
+  const bar = (k, col) => svg.append('g').selectAll('rect').data(ser.filter(d=>d[k]!=null && d[k]>0)).join('rect')
+    .attr('x',d=>x(d.m)+xi(k)).attr('width',xi.bandwidth()).attr('y',d=>y(d[k])).attr('height',d=>Math.max(0,y(0)-y(d[k])))
+    .attr('rx',Math.min(3,xi.bandwidth()/2)).attr('fill',css(col)).attr('opacity',op);
+  bar('rev','--c1'); bar('exp','--exp');
+  const c = ser.find(d=>d.m===cur);
+  if (c && soFar != null) svg.append('rect').attr('x',x(cur)+xi('rev')).attr('width',xi.bandwidth()).attr('y',y(soFar)).attr('height',Math.max(0,y(0)-y(soFar)))
+    .attr('rx',Math.min(3,xi.bandwidth()/2)).attr('fill',css('--c1'));
+  const tip = tipFor(box);
+  const hit = svg.append('g').selectAll('rect').data(ser).join('rect').attr('x',d=>x(d.m)-x.step()*x.paddingInner()/2).attr('width',x.step())
+    .attr('y',m.t).attr('height',H-m.b-m.t).attr('fill','transparent');
+  hit.on('mousemove',(ev,d)=>{ const r = (d.rev!=null && d.exp!=null) ? d.rev - d.exp : null;
+      const lines = ['Revenue: '+fl(d.rev), 'Expenditure: '+fl(d.exp)+(d.fee?' (incl. fee '+fl(d.fee)+')':''), 'Result: '+res(r).t];
+      if (d.m===cur && soFar!=null) lines.push('Revenue so far (daily reports): '+fl(soFar));
+      showTip(tip,box,ev,mfmt(d.m)+' · '+(d.kind==='actual'?'actual':d.kind==='estimate'?'estimate':'plan'),lines); })
+    .on('mouseleave',()=>tip.style.display='none');
+}
+function renderPL(P, month){
+  const sec = $('#pl-sec'), pl = DATA.pl;
+  if (!pl || !pl.units){ sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  const months = pl.months.concat(pl.f_months.slice(1));
+  const cur = months.indexOf(month) >= 0 ? month : null;
+  const lastAct = pl.months[pl.estimate_from-1], est = pl.months[pl.estimate_from];
+  $('#pl-cap').textContent = 'From the Corporate P&L 2026-27, in ₹ lakh: ' + mfmt(pl.months[0]).split(' ')[0] + '–' + mfmt(lastAct) + ' actual, ' + mfmt(est) + ' estimated, later months the plan (faint bars). '
+    + (cur ? 'The solid blue bar in ' + mfmt(cur).split(' ')[0] + ' is revenue so far from the daily reports, which can differ slightly from how the P&L counts revenue. ' : '')
+    + 'For managed hotels, expenditure includes the management fee. Each chart has its own scale.';
+  legend($('#lg-pl'), [{name:'Revenue',color:css('--c1')},{name:'Expenditure',color:css('--exp')}]);
+  const lg = $('#lg-pl'); const f = el('span'); const fi = el('i','faint'); fi.style.background = css('--c1'); f.appendChild(fi); f.appendChild(document.createTextNode('Faint = estimate or plan')); lg.appendChild(f);
+  const box = $('#pl-cards'); box.innerHTML = '';
+  const tb = $('#pl-table tbody'); tb.innerHTML = '';
+  $('#pl-th-plan').textContent = cur ? 'Planned expenditure, ' + mfmt(cur).split(' ')[0] : 'Planned expenditure';
+  $('#pl-th-so').textContent = cur ? 'Revenue so far, ' + mfmt(cur).split(' ')[0] : 'Revenue so far';
+  const units = pl.units.filter(u => u.rev.some(v=>v!=null) || P.some(p=>p.property===u.short));
+  const rows = units.map(u => {
+    const ser = plSeries(u, pl);
+    const ytd = ser.slice(0, pl.months.length);
+    const yr = d3.sum(ytd, d=>d.rev||0), ye = d3.sum(ytd, d=>d.exp||0);
+    const has = ytd.some(d=>d.rev!=null);
+    const p = P.find(x=>x.property===u.short);
+    const c = cur ? ser.find(d=>d.m===cur) : null;
+    const soFar = p ? p.total/1e5 : null, pace = p ? p.forecast/1e5 : null;
+    return {u, ser, yr: has?yr:null, ye: has?ye:null, res: has?yr-ye:null, ratio: has&&yr?ye/yr:null, p, c, soFar, pace,
+      planExp: c ? c.exp : null, covered: (c && c.exp && soFar!=null) ? soFar/c.exp : null, gap: (c && c.exp!=null && pace!=null) ? pace - c.exp : null};
+  }).sort((a,b) => (b.res==null?-1e9:b.res) - (a.res==null?-1e9:a.res));
+  rows.forEach(r => {
+    const card = el('div','card plcard');
+    const h = el('h3',null,r.u.short); h.appendChild(el('span','sub',r.u.model + ' · ' + Math.round(r.u.rooms||0) + ' rooms' + (r.u.status==='Pre-Opening'?' · pre-opening':''))); card.appendChild(h);
+    const now = el('div','plnow');
+    if (r.c && r.planExp != null && r.soFar != null){
+      const B = (t,c) => el('b',c||null,t);
+      now.appendChild(document.createTextNode(mfmt(cur).split(' ')[0]+' so far: '));
+      now.appendChild(B(fl(r.soFar))); now.appendChild(document.createTextNode(' revenue to '+dfmt(r.p.last)+', '));
+      now.appendChild(B(pct(r.covered))); now.appendChild(document.createTextNode(' of the month\'s planned expenditure ('+fl(r.planExp)+'). At this pace the month ends near '));
+      now.appendChild(B(fl(r.pace))); now.appendChild(document.createTextNode(', '));
+      if (Math.abs(r.gap) < 0.1) now.appendChild(B('about break-even'));
+      else now.appendChild(B((r.gap>=0?fl(r.gap)+' above':fl(-r.gap)+' short of')+' costs', r.gap>=0?'good':'bad'));
+      now.appendChild(document.createTextNode('.'));
+    } else if (r.c && r.planExp == null) now.appendChild(document.createTextNode('No expenditure plan for '+mfmt(cur)+' in the P&L.'));
+    else if (cur) now.appendChild(document.createTextNode('No daily sales for '+mfmt(cur)+' yet.'));
+    card.appendChild(now);
+    const ch = el('div','chart'); card.appendChild(ch);
+    const ytd = el('div','plytd');
+    if (r.yr != null){
+      const rr = res(r.res);
+      ytd.appendChild(document.createTextNode('Apr–Oct: revenue ')); ytd.appendChild(el('b',null,fl(r.yr)));
+      ytd.appendChild(document.createTextNode(', expenditure ')); ytd.appendChild(el('b',null,fl(r.ye)));
+      ytd.appendChild(document.createTextNode(', ')); ytd.appendChild(el('b',rr.c,rr.t));
+      ytd.appendChild(document.createTextNode(' (expenditure '+pct(r.ratio)+' of revenue).'));
+    } else ytd.textContent = 'No actual P&L figures yet; the bars show the plan.';
+    card.appendChild(ytd);
+    box.appendChild(card);
+    r.ch = ch;
+    const tr = el('tr'); const rr = res(r.res);
+    [[r.u.short],[fl(r.yr)],[fl(r.ye)],[rr.t,rr.c],[pct(r.ratio), r.ratio>1?'bad':r.ratio!=null?'good':''],[fl(r.planExp)],[fl(r.soFar)],
+     [pct(r.covered)],[fl(r.pace)],[r.gap==null?'—':(r.gap>=0?'+':'−')+fl(Math.abs(r.gap)), r.gap==null?'':r.gap>=0?'good':'bad']]
+      .forEach(c => tr.appendChild(el('td',c[1]||null,c[0])));
+    tb.appendChild(tr);
+  });
+  // Draw the charts once every card is in the grid, so each one measures its real width.
+  rows.forEach(r => plMini(r.ch, r.ser, cur, r.c ? r.soFar : null));
+}
+
 function render(){
   const month = $('#month').value;
   const {P, G, daily, dates, props} = compute(month);
@@ -358,6 +486,7 @@ function render(){
     tr.appendChild(el('td','late',p)); tr.appendChild(el('td','late',RD[p] ? dfmt(RD[p]) : 'No report'));
     const td = el('td',null,'No figures for ' + mfmt(month) + ' yet'); td.colSpan = 11; tr.appendChild(td); tb.appendChild(tr); });
 
+  renderPL(P, month);
   legend($('#lg-daily'), props.map((p,i)=>({name:p,color:colors[i%colors.length]})));
   dailyChart($('#ch-daily'), daily, dates, props, colors);
   weekly($('#weekly tbody'), daily);

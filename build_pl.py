@@ -1,6 +1,10 @@
 """Turn the Corporate P&L workbook into pl.json for the P&L dashboard.
 
-Usage: python3 build_pl.py "<Corporate P&L 2026-27.xlsx>" <out/pl.json>
+Usage: python3 build_pl.py "<Corporate P&L 2026-27.xlsx>" <out/pl.json> [--fallback <previous pl.json>]
+
+With --fallback, a unit whose plan months (Oct-Mar) come out empty, for example
+because the workbook's links to another file show #REF!, keeps the plan figures
+from the previous pl.json; those units are listed in "plan_from_previous".
 
 The workbook must have cached values (save it in Excel / Google Sheets, or
 recalculate it with LibreOffice) because formulas are read as their values.
@@ -88,6 +92,20 @@ def main():
         "f_months": ["2026-10", "2026-11", "2026-12", "2027-01", "2027-02", "2027-03"],
         "units": units, "corp": corp, "forecast": forecast,
     }
+    if "--fallback" in sys.argv:
+        prev = json.load(open(sys.argv[sys.argv.index("--fallback") + 1]))
+        old = {x["short"]: x for x in prev.get("units", [])}
+        kept = []
+        for x in units:
+            o = old.get(x["short"])
+            if o and all(val is None for val in (x["f_rev"] or [])) and any(val is not None for val in (o.get("f_rev") or [])):
+                for k in ("f_rev", "f_exp", "f_fee"):
+                    x[k] = o.get(k)
+                kept.append(x["short"])
+        data["plan_from_previous"] = kept
+        data["plan_previous_generated_at"] = prev.get("generated_at")
+        if kept:
+            print("plan kept from previous pl.json for: " + ", ".join(kept))
     json.dump(data, open(sys.argv[2], "w"), ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {len(units)} units to {sys.argv[2]}")
 

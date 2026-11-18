@@ -80,6 +80,16 @@ def main():
         mtd = json.load(open(mtd_path))
         data["report_mtd"] = mtd.get("properties", {})
         data["report_dates"] = mtd.get("report_dates", {})
+    # Revenue and expenditure by property from the Corporate P&L (see build_pl.py), in Rs. lakh.
+    pl_path = os.path.join(os.path.dirname(os.path.abspath(out_path)), "pl-c02c931ae5", "pl.json")
+    if os.path.exists(pl_path):
+        pl = json.load(open(pl_path))
+        keep = ("short", "rooms", "status", "model", "rev", "exp", "fee", "f_rev", "f_exp", "f_fee")
+        data["pl"] = {
+            "generated_at": pl.get("generated_at"), "months": pl.get("months"),
+            "estimate_from": pl.get("estimate_from"), "f_months": pl.get("f_months"),
+            "units": [{k: u.get(k) for k in keep} for u in pl.get("units", [])],
+        }
     json.dump(data, open(out_path, "w"), ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {len(rows)} rows to {out_path}")
 
