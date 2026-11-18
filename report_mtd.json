@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-18 11:46 IST",
+ "generated_at": "2026-11-18 12:10 IST",
  "properties": {
   "Chakrata": {
    "date": "2026-11-17",
@@ -223,6 +223,43 @@
    "day_sold": 4.0,
    "b_sold": 238.0
   },
+  "Pine Corbett": {
+   "date": "2026-11-17",
+   "room": 5130.0,
+   "day_room": 0.0,
+   "b_room": 0.0,
+   "ird": 0.0,
+   "day_ird": 0.0,
+   "restaurant": 0.0,
+   "day_restaurant": 0.0,
+   "plans": 0.0,
+   "day_plans": 0.0,
+   "bar": 0.0,
+   "day_bar": 0.0,
+   "banquet": 0.0,
+   "day_banquet": 0.0,
+   "venue": 0.0,
+   "day_venue": 0.0,
+   "fnb": 0.0,
+   "day_fnb": 0.0,
+   "b_fnb": 0.0,
+   "other": 0.0,
+   "day_other": 0.0,
+   "b_other": 0.0,
+   "total": 5130.0,
+   "day_total": 0.0,
+   "b_total": 0.0,
+   "avail": 0.0,
+   "day_avail": 0.0,
+   "b_avail": 0.0,
+   "comp": 0.0,
+   "day_comp": 0.0,
+   "ooo": 0.0,
+   "day_ooo": 0.0,
+   "sold": 1.0,
+   "day_sold": 0.0,
+   "b_sold": 0.0
+  },
   "Ranchi": {
    "date": "2026-11-15",
    "room": 258088.2,
@@ -268,7 +305,7 @@
   "Goa": "2026-11-17",
   "Gurugram": "2026-11-17",
   "Haldwani": "2026-11-17",
-  "Pine Corbett": "2026-10-27",
+  "Pine Corbett": "2026-11-17",
   "Ranchi": "2026-11-15"
  }
 }
