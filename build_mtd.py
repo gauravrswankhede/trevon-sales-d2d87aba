@@ -95,6 +95,7 @@ def main():
     folder = sys.argv[1]
     out_path = sys.argv[2] if len(sys.argv) > 2 else "report_mtd.json"
     props = {}
+    dates = {}
     for name in sorted(os.listdir(folder)):
         if not name.endswith(".json"):
             continue
@@ -105,12 +106,13 @@ def main():
             print(f"{prop}: no rows, skipped")
             continue
         r = parse(values)
+        dates[prop] = r.get("date")
         if not r.get("date") or not r.get("total"):
             print(f"{prop}: report date {r.get('date')} with no month-to-date revenue, skipped")
             continue
         props[prop] = r
         print(f"{prop}: report {r['date']}, MTD revenue {r['total']:,.0f}, budget {r.get('b_total', 0):,.0f}")
-    data = {"generated_at": datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"), "properties": props}
+    data = {"generated_at": datetime.now(IST).strftime("%Y-%m-%d %H:%M IST"), "properties": props, "report_dates": dates}
     json.dump(data, open(out_path, "w"), ensure_ascii=False, indent=1)
     print(f"wrote {len(props)} properties to {out_path}")
 

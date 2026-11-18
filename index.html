@@ -55,6 +55,10 @@ th{text-align:right;font-weight:600;color:var(--muted);padding:7px 9px;border-bo
 td{text-align:right;padding:8px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
 .good{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+td.ontime,td.late{font-weight:600;border-radius:4px}
+td.ontime{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+td.late{color:var(--bad);background:color-mix(in srgb,var(--bad) 16%,transparent)}
+.note .late{color:var(--bad);font-weight:600}
 ul.watch{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 ul.watch b{font-weight:600}
 .err{padding:40px;text-align:center;color:var(--muted)}
@@ -298,8 +302,17 @@ function render(){
   const add = (t,b) => { const n = b ? el('b',null,t) : document.createTextNode(t); tk.appendChild(n); };
   add('Group revenue is at '); add(pct(G.pct),1); add(' of budget for '+mfmt(month)+' so far: '); add(inr(G.total),1); add(' against '); add(inr(G.b_total),1);
   add('. At this pace the month closes near '); add(inr(G.forecast),1); add(', against a budget of '); add(inr(G.forecast_b),1); add('.');
-  const lag = P.filter(p => p.last < (G.day_date || p.last)).map(p => p.property + ' (' + dfmt(p.last) + ')');
-  $('#note').textContent = lag.length ? 'Not yet reported for ' + dfmt(G.day_date) + ': ' + lag.join(', ') + '. Their figures run to the date shown.' : 'All properties reported up to ' + (G.day_date ? dfmt(G.day_date) : '—') + '.';
+  // A property is on time when its Daily Revenue Report shows yesterday (IST) or later.
+  const EXPECTED = new Date(Date.now() + 5.5*36e5 - 864e5).toISOString().slice(0,10);
+  const isCurrent = EXPECTED.slice(0,7) === month;
+  const RD = DATA.report_dates || {};
+  const missing = Object.keys(RD).filter(p => P.every(x => x.property !== p));
+  const lateList = isCurrent ? P.filter(p => p.last < EXPECTED).map(p => p.property + ' (' + dfmt(p.last) + ')')
+      .concat(missing.map(p => p + (RD[p] ? ' (' + dfmt(RD[p]) + ')' : ' (no report)'))) : [];
+  const nt = $('#note'); nt.innerHTML = '';
+  if (!isCurrent) nt.textContent = 'Figures as last reported for ' + mfmt(month) + '.';
+  else if (lateList.length) { nt.appendChild(el('span','late','Behind schedule, no report for ' + dfmt(EXPECTED) + ': ' + lateList.join(', ') + '.')); nt.appendChild(document.createTextNode(' Their figures run to the date shown.')); }
+  else nt.textContent = 'All properties have reported for ' + dfmt(EXPECTED) + '.';
 
   const k = $('#kpis'); k.innerHTML = '';
   k.appendChild(tile('Total revenue · month to date', inr(G.total), pct(G.pct)+' of budget'));
@@ -337,9 +350,13 @@ function render(){
 
   const tb = $('#score tbody'); tb.innerHTML = '';
   P.slice().sort((a,b)=>b.pct-a.pct).forEach(p => { const tr = el('tr');
-    [[p.property],[dfmt(p.last)],[inr(p.total)],[pct(p.pct),p.pct>=.95?'good':p.pct<.5?'bad':'warn'],[inr(p.room)],[inr(p.fnb)],[pct(p.occ),p.occ<p.occ_b-.15?'bad':''],[pct(p.occ_b)],
+    const st = isCurrent ? (p.last < EXPECTED ? 'late' : 'ontime') : null;
+    [[p.property,st],[dfmt(p.last),st],[inr(p.total)],[pct(p.pct),p.pct>=.95?'good':p.pct<.5?'bad':'warn'],[inr(p.room)],[inr(p.fnb)],[pct(p.occ),p.occ<p.occ_b-.15?'bad':''],[pct(p.occ_b)],
      [inr(p.arr)],[inr(p.revpar)],[inr(p.forecast)],[inr(p.day)],[spct(p.day_change),p.day_change==null?'':p.day_change>=0?'good':'bad']]
      .forEach(c => tr.appendChild(el('td',c[1]||null,c[0]))); tb.appendChild(tr); });
+  if (isCurrent) missing.forEach(p => { const tr = el('tr');
+    tr.appendChild(el('td','late',p)); tr.appendChild(el('td','late',RD[p] ? dfmt(RD[p]) : 'No report'));
+    const td = el('td',null,'No figures for ' + mfmt(month) + ' yet'); td.colSpan = 11; tr.appendChild(td); tb.appendChild(tr); });
 
   legend($('#lg-daily'), props.map((p,i)=>({name:p,color:colors[i%colors.length]})));
   dailyChart($('#ch-daily'), daily, dates, props, colors);

@@ -77,7 +77,9 @@ def main():
     # Month-to-date figures from each hotel's latest Daily Revenue Report (see build_mtd.py).
     mtd_path = os.path.join(os.path.dirname(os.path.abspath(out_path)), "report_mtd.json")
     if os.path.exists(mtd_path):
-        data["report_mtd"] = json.load(open(mtd_path)).get("properties", {})
+        mtd = json.load(open(mtd_path))
+        data["report_mtd"] = mtd.get("properties", {})
+        data["report_dates"] = mtd.get("report_dates", {})
     json.dump(data, open(out_path, "w"), ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {len(rows)} rows to {out_path}")
 

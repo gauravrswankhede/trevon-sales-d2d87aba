@@ -1,5 +1,5 @@
 {
- "generated_at": "2026-11-18 11:23 IST",
+ "generated_at": "2026-11-18 11:28 IST",
  "properties": {
   "Chakrata": {
    "date": "2026-11-17",
@@ -260,5 +260,15 @@
    "day_sold": 0.0,
    "b_sold": 432.0
   }
+ },
+ "report_dates": {
+  "Chakrata": "2026-11-17",
+  "Delhi": "2026-11-17",
+  "Dhanbad": "2026-11-16",
+  "Goa": "2026-11-17",
+  "Gurugram": "2026-11-17",
+  "Haldwani": "2026-11-17",
+  "Pine Corbett": "2026-10-27",
+  "Ranchi": "2026-11-15"
  }
 }
