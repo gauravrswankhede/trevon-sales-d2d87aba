@@ -6,6 +6,7 @@ The input is the JSON returned by the Google Sheets get_values call on
 'All properties'!A1:W (displayed values, e.g. "₹761,942", "24-Oct-2026").
 """
 import json
+import os
 import sys
 from datetime import datetime, timezone, timedelta
 
@@ -73,6 +74,10 @@ def main():
     rows.sort(key=lambda r: (r["property"], r["date"]))
     ist = timezone(timedelta(hours=5, minutes=30))
     data = {"generated_at": datetime.now(ist).strftime("%Y-%m-%d %H:%M IST"), "rows": rows}
+    # Month-to-date figures from each hotel's latest Daily Revenue Report (see build_mtd.py).
+    mtd_path = os.path.join(os.path.dirname(os.path.abspath(out_path)), "report_mtd.json")
+    if os.path.exists(mtd_path):
+        data["report_mtd"] = json.load(open(mtd_path)).get("properties", {})
     json.dump(data, open(out_path, "w"), ensure_ascii=False, separators=(",", ":"))
     print(f"wrote {len(rows)} rows to {out_path}")
 

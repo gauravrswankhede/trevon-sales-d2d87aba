@@ -89,7 +89,7 @@ footer{color:var(--muted);font-size:12.5px}
 
   <section class="card">
     <h2>Property scorecard</h2>
-    <p class="cap">ARR = room revenue ÷ rooms sold. RevPAR = room revenue ÷ all room-nights. Occupancy counts every room, including out-of-order ones. Forecast = revenue so far ÷ days so far × days in the month.</p>
+    <p class="cap">ARR = room revenue ÷ rooms sold. RevPAR = room revenue ÷ all room-nights. Occupancy counts every room, including out-of-order ones. Forecast = revenue so far ÷ days so far × days in the month. Month-to-date figures and budgets are taken from each hotel's latest Daily Revenue Report, so a day a hotel skipped is still counted once a later report includes it.</p>
     <div class="tw"><table id="score"><thead><tr><th>Property</th><th>Latest day</th><th>Revenue MTD</th><th>% of budget</th><th>Rooms MTD</th><th>F&amp;B MTD</th><th>Occupancy</th><th>Occ. budget</th><th>ARR</th><th>RevPAR</th><th>Month forecast</th><th>Latest day revenue</th><th>vs day before</th></tr></thead><tbody></tbody></table></div>
   </section>
 
@@ -117,7 +117,7 @@ footer{color:var(--muted);font-size:12.5px}
     </div>
   </section>
 
-  <footer id="foot">Figures come from each property's Daily Sales Log in Google Drive and refresh every day at 12:00 noon IST.</footer>
+  <footer id="foot">Figures come from each property's Daily Sales Log in Google Drive and refresh every day at 12:07 pm and 9:07 pm IST. Month-to-date totals come from each hotel's latest Daily Revenue Report.</footer>
 </div>
 
 <script>
@@ -139,19 +139,31 @@ function el(tag, cls, text){ const e = document.createElement(tag); if (cls) e.c
 
 function compute(month){
   const R = DATA.rows.filter(r => r.date.slice(0,7) === month);
-  const props = Array.from(new Set(R.map(r => r.property)));
+  const RM = DATA.report_mtd || {};
+  const props = Array.from(new Set(R.map(r => r.property).concat(Object.keys(RM).filter(p => RM[p].date && RM[p].date.slice(0,7) === month))));
   const P = props.map(p => {
     const pr = R.filter(r => r.property === p).sort((a,b) => a.date < b.date ? -1 : 1);
-    const last = pr[pr.length-1];
-    const days = +last.date.slice(8,10);
     const daily = pr.filter(r => r.type !== 'Carried forward');
-    const ld = daily[daily.length-1] || null, pd = daily.length > 1 ? daily[daily.length-2] : null;
-    const o = {property:p, last:last.date, days:days};
-    ['room','fnb','other','total','b_room','b_fnb','b_other','b_total','sold','avail','ooo','b_sold','restaurant','ird','plans','banquet','bar','venue'].forEach(k => o[k] = sum(pr,k));
+    let ld = daily[daily.length-1] || null, pd = daily.length > 1 ? daily[daily.length-2] : null;
+    const KEYS = ['room','fnb','other','total','b_room','b_fnb','b_other','b_total','sold','avail','ooo','b_sold','restaurant','ird','plans','banquet','bar','venue'];
+    const rm = RM[p] && RM[p].date && RM[p].date.slice(0,7) === month ? RM[p] : null;
+    let o;
+    if (rm) {
+      // Month to date as the hotel's own latest report states it, so skipped days still count.
+      o = {property:p, last:rm.date, days:+rm.date.slice(8,10), src:'report'};
+      KEYS.forEach(k => o[k] = rm[k] || 0);
+      if (!ld || ld.date !== rm.date) { pd = ld; ld = {date:rm.date, total:rm.day_total||0}; }
+      const dayBefore = new Date(Date.parse(rm.date + 'T00:00:00Z') - 864e5).toISOString().slice(0,10);
+      if (pd && pd.date !== dayBefore) pd = null;
+    } else {
+      const last = pr[pr.length-1];
+      o = {property:p, last:last.date, days:+last.date.slice(8,10), src:'log'};
+      KEYS.forEach(k => o[k] = sum(pr,k));
+    }
     o.pct = o.b_total ? o.total/o.b_total : null;
-    o.occ = o.avail ? o.sold/o.avail : null; o.occ_b = o.avail ? o.b_sold/o.avail : null;
+    o.occ = o.avail ? o.sold/o.avail : null; o.occ_b = (rm && rm.b_avail) ? o.b_sold/rm.b_avail : (o.avail ? o.b_sold/o.avail : null);
     o.arr = o.sold ? o.room/o.sold : null; o.revpar = o.avail ? o.room/o.avail : null;
-    o.forecast = o.total/days*dim(month); o.forecast_b = o.b_total/days*dim(month);
+    o.forecast = o.total/o.days*dim(month); o.forecast_b = o.b_total/o.days*dim(month);
     o.fnb_share = o.total ? o.fnb/o.total : null; o.ooo_share = o.avail ? o.ooo/o.avail : null;
     o.day = ld ? ld.total : null; o.day_date = ld ? ld.date : null;
     o.day_change = (ld && pd && pd.total) ? ld.total/pd.total - 1 : null;
